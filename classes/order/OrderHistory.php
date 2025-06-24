@@ -402,8 +402,8 @@ class OrderHistoryCore extends ObjectModel
                 $carrierUrl = $carrier->url;
             }
             $data = [
-                '{lastname}' => $result['lastname'],
-                '{firstname}' => $result['firstname'],
+                '{lastname}' => $result['lastname'] ?? '',
+                '{firstname}' => $result['firstname'] ?? '',
                 '{id_order}' => (int) $this->id_order,
                 '{order_name}' => $order->getUniqReference(),
                 '{followup}' => str_replace('@', $order->getShippingNumber() ?? '', $carrierUrl),
