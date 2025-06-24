@@ -116,8 +116,8 @@ class OrderDetailControllerCore extends FrontController
                                 'Emails.Subject'
                             ),
                             [
-                                '{lastname}' => $customer->lastname,
-                                '{firstname}' => $customer->firstname,
+                                '{lastname}' => $customer->lastname ?? '',
+                                '{firstname}' => $customer->firstname ?? '',
                                 '{email}' => $customer->email,
                                 '{id_order}' => (int) $order->id,
                                 '{order_name}' => $order->getUniqReference(),
