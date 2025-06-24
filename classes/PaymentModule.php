@@ -647,8 +647,8 @@ abstract class PaymentModuleCore extends Module
 
                 if (Validate::isEmail($this->context->customer->email)) {
                     $data = [
-                        '{firstname}' => $this->context->customer->firstname,
-                        '{lastname}' => $this->context->customer->lastname,
+                        '{firstname}' => $this->context->customer->firstname ?? '',
+                        '{lastname}' => $this->context->customer->lastname ?? '',
                         '{email}' => $this->context->customer->email,
                         '{delivery_block_txt}' => $this->_getFormatedAddress($delivery, AddressFormat::FORMAT_NEW_LINE),
                         '{invoice_block_txt}' => $this->_getFormatedAddress($invoice, AddressFormat::FORMAT_NEW_LINE),
@@ -1222,8 +1222,8 @@ abstract class PaymentModuleCore extends Module
                     $params = [
                         '{voucher_amount}' => Tools::getContextLocale($this->context)->formatPrice($voucher->reduction_amount, $this->context->currency->iso_code),
                         '{voucher_num}' => $voucher->code,
-                        '{firstname}' => $this->context->customer->firstname,
-                        '{lastname}' => $this->context->customer->lastname,
+                        '{firstname}' => $this->context->customer->firstname ?? '',
+                        '{lastname}' => $this->context->customer->lastname ?? '',
                         '{id_order}' => $order->id,
                         '{order_name}' => $order->getUniqReference(),
                     ];
