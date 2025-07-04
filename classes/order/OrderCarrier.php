@@ -135,8 +135,8 @@ class OrderCarrierCore extends ObjectModel
         $orderLanguage = new Language((int) $orderLanguageId);
         $templateVars = [
             '{followup}' => str_replace('@', $this->tracking_number, $carrier->url),
-            '{firstname}' => $customer->firstname ?? '',
-            '{lastname}' => $customer->lastname ?? '',
+            '{firstname}' => !empty($customer->firstname) ? $customer->firstname : '',
+            '{lastname}' => !empty($customer->lastname) ? $customer->lastname : '',
             '{id_order}' => $order->id,
             '{shipping_number}' => $this->tracking_number,
             '{order_name}' => $order->getUniqReference(),
