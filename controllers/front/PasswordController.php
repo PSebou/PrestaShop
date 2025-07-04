@@ -94,8 +94,8 @@ class PasswordControllerCore extends FrontController
 
                 $mailParams = [
                     '{email}' => $customer->email,
-                    '{lastname}' => $customer->lastname ?? '',
-                    '{firstname}' => $customer->firstname ?? '',
+                    '{lastname}' => !empty($customer->lastname) ? $customer->lastname : '',
+                    '{firstname}' => !empty($customer->firstname) ? $customer->firstname : '',
                     '{url}' => $this->context->link->getPageLink('password', null, null, 'token=' . $customer->secure_key . '&id_customer=' . (int) $customer->id . '&reset_token=' . $customer->reset_password_token),
                 ];
 
@@ -225,8 +225,8 @@ class PasswordControllerCore extends FrontController
 
                         $mail_params = [
                             '{email}' => $customer->email,
-                            '{lastname}' => $customer->lastname ?? '',
-                            '{firstname}' => $customer->firstname ?? '',
+                            '{lastname}' =>  !empty($customer->lastname) ? $customer->lastname : '',
+                            '{firstname}' => !empty($customer->firstname) ? $customer->firstname : '',
                         ];
 
                         if (
