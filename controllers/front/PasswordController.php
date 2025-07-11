@@ -225,7 +225,7 @@ class PasswordControllerCore extends FrontController
 
                         $mail_params = [
                             '{email}' => $customer->email,
-                            '{lastname}' =>  !empty($customer->lastname) ? $customer->lastname : '',
+                            '{lastname}' => !empty($customer->lastname) ? $customer->lastname : '',
                             '{firstname}' => !empty($customer->firstname) ? $customer->firstname : '',
                         ];
 
