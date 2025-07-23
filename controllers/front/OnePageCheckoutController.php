@@ -29,30 +29,39 @@ use PrestaShop\PrestaShop\Core\Checkout\TermsAndConditions;
 use PrestaShop\PrestaShop\Core\Foundation\Templating\RenderableProxy;
 use PrestaShopBundle\Translation\TranslatorComponent;
 
-class OnePageCheckoutControllerCore extends CheckoutController
+class OnePageCheckoutControllerCore extends FrontController
 {
+    /** @var bool */
+    public $ssl = true;
     /** @var string */
-    public $php_self = 'one-page-checkout';
+    public $php_self = 'onepagecheckout';
     /** @var string */
     public $page_name = 'one-page-checkout';
-
-    protected $template = 'checkout/one-page-checkout';
-
-    /**
-     * @var CustomerForm
-     */
-    private CustomerForm $formCustomer;
+    public $opcWarning = [];
 
     /**
-     * @var CustomerLoginForm
+     * @var CheckoutProcess
      */
-    private CustomerLoginForm $formLogin;
+    protected $opcProcess;
 
     /**
-     * @var GuestForm
+     * @var CartChecksum
      */
-    private GuestForm $formGuest;
+    protected $cartChecksum;
 
+    /**
+     * Overrides the same parameter in FrontController
+     *
+     * @var bool automaticallyAllocateInvoiceAddress
+     */
+    protected $automaticallyAllocateInvoiceAddress = false;
+
+    /**
+     * Overrides the same parameter in FrontController
+     *
+     * @var bool
+     */
+    protected $automaticallyAllocateDeliveryAddress = false;
 
     /**
      * Initialize order controller.
@@ -62,25 +71,38 @@ class OnePageCheckoutControllerCore extends CheckoutController
     public function init(): void
     {
         parent::init();
-        $this->formCustomer = $this->makeCustomerForm(true);
-        $this->formLogin = $this->makeLoginForm(true);
-        $this->formGuest = $this->makeGuestForm();
-
+        $this->cartChecksum = new CartChecksum(new AddressChecksum());
     }
 
     public function postProcess(): void
     {
         parent::postProcess();
 
-       if(Tools::isSubmit('ajax')){
-            if(Tools::isSubmit('submitCreateGuest')){
-                $this->displayAjaxGuestCreate();
-            } else if( Tools::isSubmit('submitLogin')){
-                $this->displayAjaxLogin();
-            } else if( Tools::isSubmit('submitCustomer')){
-                $this->displayAjaxCustomer();
+        if (Tools::isSubmit('submitReorder')
+            && $this->context->customer->isLogged()
+            && $id_order = (int) Tools::getValue('id_order')
+        ) {
+            $oldCart = new Cart(Order::getCartIdStatic($id_order, $this->context->customer->id));
+            $duplication = $oldCart->duplicate();
+            if (!$duplication || !Validate::isLoadedObject($duplication['cart'])) {
+                $this->errors[] = $this->trans('Sorry. We cannot renew your order.', [], 'Shop.Notifications.Error');
+            } elseif (!$duplication['success']) {
+                $this->errors[] = $this->trans(
+                    'Some items are no longer available, and we are unable to renew your order.',
+                    [],
+                    'Shop.Notifications.Error'
+                );
+            } else {
+                $this->context->cookie->id_cart = $duplication['cart']->id;
+                $context = $this->context;
+                $context->cart = $duplication['cart'];
+                CartRule::autoAddToCart($context);
+                $this->context->cookie->write();
+                Tools::redirect($this->context->link->getPageLink('order'));
             }
         }
+
+        $this->bootstrap();
     }
 
     /**
@@ -91,77 +113,129 @@ class OnePageCheckoutControllerCore extends CheckoutController
         return $this->checkoutProcess;
     }
 
-    public function displayAjaxGuestCreate(): void
+    /**
+     * @return CheckoutSession
+     */
+    public function getCheckoutSession(): CheckoutSession
     {
-        $responseData = [
-            'errors' => false,
-            'idCustomer' => '',
-        ];
+        $deliveryOptionsFinder = new DeliveryOptionsFinder(
+            $this->context,
+            $this->getTranslator(),
+            $this->objectPresenter,
+            new PriceFormatter()
+        );
 
-        try{
+        $session = new CheckoutSession(
+            $this->context,
+            $deliveryOptionsFinder
+        );
 
-            $customerPersister = new CustomerPersister($this->context,
-                $this->get('hashing'),
-                $this->getTranslator(),
-                true
-            );
-            $customer = new Customer(Tools::getValue('id_customer')??null);
-            $customer->is_guest = true;
-            $customer->email = Tools::getValue('email');
-            $customer->firstname = '';
-            $customer->lastname = '';
-            $ok = $customerPersister->save($customer,'');
-
-            if($ok === false){
-                $responseData['errors'] = true;
-            } else {
-                $responseData['idCustomer'] = $customer->id;
-            }
-
-        }catch (Exception $e){
-            $responseData['errors'] = true;
-            $responseData['message'] = $e->getMessage();
-        }
-        header('Content-Type: application/json');
-        $this->ajaxRender(json_encode($responseData));
+        return $session;
     }
 
-
-    public function displayAjaxLogin(): void
+    protected function bootstrap(): void
     {
-        $responseData = [
-            'errors' => false,
-            'idCustomer' => '',
-        ];
+        $translator = $this->getTranslator();
+        $session = $this->getCheckoutSession();
 
-        try{
-            $this->formLogin->submit();
-            $responseData['idCustomer'] = $this->cookie->id_customer;
-
-        }catch (Exception $e){
-            $responseData['errors'] = true;
-            $responseData['message'] = $e->getMessage();
-        }
-        header('Content-Type: application/json');
-        $this->ajaxRender(json_encode($responseData));
+        $this->checkoutProcess = $this->buildCheckoutProcess($session, $translator);
+        Hook::exec('actionCheckoutRender', ['checkoutProcess' => &$this->checkoutProcess]);
     }
 
-    public function displayAjaxCustomer(): void
+    /**
+     * Persists cart-related data in checkout session.
+     *
+     * @param CheckoutProcess $process
+     */
+    protected function saveDataToPersist(CheckoutProcess $process)
+    {
+        $data = $process->getDataToPersist();
+        $cart = $this->context->cart;
+
+        $data['checksum'] = $this->cartChecksum->generateChecksum($cart);
+
+        Db::getInstance()->execute(
+            'UPDATE ' . _DB_PREFIX_ . 'cart SET checkout_session_data = "' . pSQL(json_encode($data)) . '"
+                WHERE id_cart = ' . (int) $cart->id
+        );
+    }
+
+    /**
+     * Restores from checkout session some previously persisted cart-related data.
+     *
+     * @param CheckoutProcess $process
+     */
+    protected function restorePersistedData(CheckoutProcess $process)
+    {
+        $cart = $this->context->cart;
+        $customer = $this->context->customer;
+        $rawData = Db::getInstance()->getValue(
+            'SELECT checkout_session_data FROM ' . _DB_PREFIX_ . 'cart WHERE id_cart = ' . (int) $cart->id
+        );
+        $data = json_decode($rawData ?? '', true);
+        if (!is_array($data)) {
+            $data = [];
+        }
+
+        $addressValidator = new AddressValidator();
+        $invalidAddressIds = $addressValidator->validateCartAddresses($cart);
+
+        // Build the currently selected address' warning message (if relevant)
+        if (!$customer->isGuest() && !empty($invalidAddressIds)) {
+            $this->checkoutWarning['address'] = [
+                'id_address' => (int) reset($invalidAddressIds),
+                'exception' => $this->trans(
+                    'Your address is incomplete, please update it.',
+                    [],
+                    'Shop.Notifications.Error'
+                ),
+            ];
+        }
+
+        // Prevent check for guests
+        if ($customer->id) {
+            // Prepare all other addresses' warning messages (if relevant).
+            // These messages are displayed when changing the selected address.
+            $allInvalidAddressIds = $addressValidator->validateCustomerAddresses($customer, $this->context->language);
+            $this->checkoutWarning['invalid_addresses'] = $allInvalidAddressIds;
+        }
+
+        if (isset($data['checksum']) && $data['checksum'] === $this->cartChecksum->generateChecksum($cart)) {
+            $process->restorePersistedData($data);
+        }
+    }
+
+    public function displayAjaxselectDeliveryOption(): void
+    {
+        $cart = $this->cart_presenter->present(
+            $this->context->cart,
+            true
+        );
+
+        ob_end_clean();
+        header('Content-Type: application/json');
+        $this->ajaxRender(json_encode([
+            'preview' => $this->render('checkout/_partials/cart-summary', [
+                'cart' => $cart,
+                'static_token' => Tools::getToken(false),
+            ]),
+        ]));
+    }
+
+    public function displayAjaxCheckCartStillOrderable(): void
     {
         $responseData = [
             'errors' => false,
-            'idCustomer' => '',
+            'cartUrl' => '',
         ];
 
-        try{
-            $this->formCustomer->fillWith(Tools::getAllValues());
-            $this->formCustomer->submit();
-            $responseData['idCustomer'] = $this->context->customer->id;
-
-        }catch (Exception $e){
+        if ($this->context->cart->isAllProductsInStock() !== true
+            || $this->context->cart->checkAllProductsAreStillAvailableInThisState() !== true
+            || $this->context->cart->checkAllProductsHaveMinimalQuantities() !== true) {
             $responseData['errors'] = true;
-            $responseData['message'] = $e->getMessage();
+            $responseData['cartUrl'] = $this->context->link->getPageLink('cart', null, null, ['action' => 'show']);
         }
+
         header('Content-Type: application/json');
         $this->ajaxRender(json_encode($responseData));
     }
@@ -173,18 +247,61 @@ class OnePageCheckoutControllerCore extends CheckoutController
      */
     public function initContent(): void
     {
-        parent::initContent();
-        $this->registerJavascript('one-page-checkout', '/themes/one-page-checkout.js', ['position' => 'bottom', 'priority' => 1000]);
+        if (Configuration::isCatalogMode()) {
+            Tools::redirect('index.php');
+        }
+
+        $this->restorePersistedData($this->checkoutProcess);
+        $this->checkoutProcess->handleRequest(
+            Tools::getAllValues()
+        );
+
+        $presentedCart = $this->cart_presenter->present($this->context->cart, true);
+
+        $shouldRedirectToCart = false;
+
+        // Check the cart meets minimal order amount treshold
+        // Check that the cart is not empty
+        if (count($presentedCart['products']) <= 0 || $presentedCart['minimalPurchaseRequired']) {
+            $shouldRedirectToCart = true;
+        }
+
+        // Check that products are still orderable, at any point in checkout
+        if ($this->context->cart->isAllProductsInStock() !== true
+            || $this->context->cart->checkAllProductsAreStillAvailableInThisState() !== true
+            || $this->context->cart->checkAllProductsHaveMinimalQuantities() !== true) {
+            $shouldRedirectToCart = true;
+        }
+
+        // If there was a problem, we redirect the user to cart, CartController deals with display of detailed errors
+        // We don't redirect in case of ajax requests, so we can get our response
+        if ($shouldRedirectToCart === true && !$this->ajax) {
+            $cartLink = $this->context->link->getPageLink('cart', null, null, ['action' => 'show']);
+            $this->redirectWithNotifications($cartLink);
+        }
+
+        $this->checkoutProcess
+            ->setNextStepReachable()
+            ->markCurrentStep()
+            ->invalidateAllStepsAfterCurrent();
+
+        $this->saveDataToPersist($this->checkoutProcess);
+
+        if (!$this->checkoutProcess->hasErrors()) {
+            if ($_SERVER['REQUEST_METHOD'] !== 'GET' && !$this->ajax) {
+                $this->redirectWithNotifications(
+                    $this->checkoutProcess->getCheckoutSession()->getCheckoutURL()
+                );
+            }
+        }
 
         $this->context->smarty->assign([
-            'guest_allowed' => false,
-            'guest_form'=> $this->formGuest,
-            'register_form' => $this->formCustomer,
-            'login_form' => $this->formLogin,
+            'checkout_process' => new RenderableProxy($this->checkoutProcess),
             'display_transaction_updated_info' => Tools::getIsset('updatedTransaction'),
             'tos_cms' => $this->getDefaultTermsAndConditions(),
         ]);
 
+        parent::initContent();
         $this->setTemplate('checkout/one-page-checkout');
     }
 
@@ -222,5 +339,94 @@ class OnePageCheckoutControllerCore extends CheckoutController
                 $templateParams
             ),
         ]));
+    }
+
+    /**
+     * Return default TOS link for checkout footer
+     *
+     * @return string|bool
+     */
+    protected function getDefaultTermsAndConditions(): string|bool
+    {
+        $cms = new CMS((int) Configuration::get('PS_CONDITIONS_CMS_ID'), $this->context->language->id);
+
+        if (!Validate::isLoadedObject($cms)) {
+            return false;
+        }
+
+        $link = $this->context->link->getCMSLink($cms, $cms->link_rewrite);
+
+        $termsAndConditions = new TermsAndConditions();
+        $termsAndConditions
+            ->setText(
+                '[' . $cms->meta_title . ']',
+                $link
+            )
+            ->setIdentifier('terms-and-conditions-footer');
+
+        return $termsAndConditions->format();
+    }
+
+    /**
+     * @param CheckoutSession $session
+     * @param TranslatorComponent $translator
+     *
+     * @return CheckoutProcess
+     */
+    protected function buildCheckoutProcess(CheckoutSession $session, $translator)
+    {
+        $opcProcess = new CheckoutProcess(
+            $this->context,
+            $session
+        );
+
+        $opcProcess
+            ->addStep(new CheckoutPersonalInformationStep(
+                $this->context,
+                $translator,
+                $this->makeLoginForm(),
+                $this->makeCustomerForm()
+            ))
+            ->addStep(new CheckoutAddressesStep(
+                $this->context,
+                $translator,
+                $this->makeAddressForm()
+            ));
+
+        if (!$this->context->cart->isVirtualCart()) {
+            $checkoutDeliveryStep = new CheckoutDeliveryStep(
+                $this->context,
+                $translator
+            );
+
+            $checkoutDeliveryStep
+                ->setRecyclablePackAllowed((bool) Configuration::get('PS_RECYCLABLE_PACK'))
+                ->setGiftAllowed((bool) Configuration::get('PS_GIFT_WRAPPING'))
+                ->setIncludeTaxes(
+                    !Product::getTaxCalculationMethod((int) $this->context->cart->id_customer)
+                    && (int) Configuration::get('PS_TAX')
+                )
+                ->setDisplayTaxesLabel(Configuration::get('PS_TAX'))
+                ->setGiftCost(
+                    $this->context->cart->getGiftWrappingPrice(
+                        $checkoutDeliveryStep->getIncludeTaxes()
+                    )
+                );
+
+            $opcProcess->addStep($checkoutDeliveryStep);
+        }
+
+        $opcProcess
+            ->addStep(new CheckoutPaymentStep(
+                $this->context,
+                $translator,
+                new PaymentOptionsFinder(),
+                new ConditionsToApproveFinder(
+                    $this->context,
+                    $translator
+                )
+            ));
+
+        return $opcProcess;
     }
 }
