@@ -944,6 +944,7 @@ class FrontControllerCore extends Controller
         $this->registerJavascript('theme-custom', '/assets/js/custom.js', ['position' => 'bottom', 'priority' => 1000]);
 
         $assets = $this->context->shop->theme->getPageSpecificAssets($this->php_self);
+
         if (!empty($assets)) {
             foreach ($assets['css'] as $css) {
                 $this->registerStylesheet($css['id'], $css['path'], $css);
@@ -1963,6 +1964,20 @@ class FrontControllerCore extends Controller
             $this->getTranslator(),
             new CustomerLoginFormatter($this->getTranslator()),
             $this->getTemplateVarUrls()
+        );
+
+        $form->setAction($this->getCurrentURL());
+
+        return $form;
+    }
+
+    protected function makeGuestForm()
+    {
+        $form = new GuestForm(
+            $this->context->smarty,
+            $this->context,
+            $this->getTranslator(),
+            new GuestFormatter($this->getTranslator(), $this->context->language)
         );
 
         $form->setAction($this->getCurrentURL());
