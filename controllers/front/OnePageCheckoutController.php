@@ -34,7 +34,7 @@ class OnePageCheckoutControllerCore extends FrontController
     /** @var bool */
     public $ssl = true;
     /** @var string */
-    public $php_self = 'onepagecheckout';
+    public $php_self = 'one-page-checkout';
     /** @var string */
     public $page_name = 'one-page-checkout';
     public $opcWarning = [];
@@ -70,6 +70,7 @@ class OnePageCheckoutControllerCore extends FrontController
      */
     public function init(): void
     {
+        ini_set('memory_limit', '4095M');
         parent::init();
         $this->cartChecksum = new CartChecksum(new AddressChecksum());
     }
@@ -295,8 +296,13 @@ class OnePageCheckoutControllerCore extends FrontController
             }
         }
 
+        $this->registerJavascript('one-page-checkout', '/themes/one-page-checkout.js', ['position' => 'bottom', 'priority' => 1000]);
+
         $this->context->smarty->assign([
-            'checkout_process' => new RenderableProxy($this->checkoutProcess),
+            'guest_allowed' => false,
+            'guest_form'=> $this->makeGuestForm(),
+            'register_form' => $this->makeCustomerForm(),
+            'login_form' => $this->makeLoginForm(),
             'display_transaction_updated_info' => Tools::getIsset('updatedTransaction'),
             'tos_cms' => $this->getDefaultTermsAndConditions(),
         ]);
@@ -385,7 +391,8 @@ class OnePageCheckoutControllerCore extends FrontController
                 $this->context,
                 $translator,
                 $this->makeLoginForm(),
-                $this->makeCustomerForm()
+                $this->makeCustomerForm(),
+                $this->makeGuestForm()
             ))
             ->addStep(new CheckoutAddressesStep(
                 $this->context,

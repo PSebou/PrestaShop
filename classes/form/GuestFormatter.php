@@ -30,6 +30,13 @@ class GuestFormatterCore implements FormFormatterInterface
     private $translator;
     private $language;
 
+    private $ask_for_birthdate = true;
+    private $ask_for_partner_optin = true;
+    private $partner_optin_is_required = true;
+    private $ask_for_password = true;
+    private $password_is_required = true;
+    private $ask_for_new_password = false;
+
     public function __construct(
         TranslatorInterface $translator,
         Language            $language
@@ -52,11 +59,6 @@ class GuestFormatterCore implements FormFormatterInterface
                 )
             )
             ->setRequired(true);
-
-        $format['id_customer'] = (new FormField())
-            ->setName('id_customer')
-            ->setType('hidden')
-            ->setValue('');
 
         return $this->addConstraints($format);
     }
