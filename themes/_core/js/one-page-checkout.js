@@ -22,42 +22,39 @@
  * @copyright Since 2007 PrestaShop SA and Contributors
  * @license   https://opensource.org/licenses/OSL-3.0 Open Software License (OSL 3.0)
  */
-const TerserPlugin = require("terser-webpack-plugin");
+import $ from 'jquery';
 
-module.exports = (env, argv) => {
-  const path = require('path');
-  const mode = argv.mode || 'production';
+$(document).ready(() => {
+  let lastSentEmail = '';
 
-  return {
-    mode,
-    entry: {
-      core: './_core/js/theme.js',
-      'one-page-checkout': './_core/js/one-page-checkout.js',
-    },
-    output: {
-      path: path.resolve(__dirname),
-      filename: '[name].js',
-      chunkFilename: '[chunkhash]-chunk.js',
-    },
-    module: {
-      rules: [
-        {
-          test: /\.js$/,
-          use: {
-            loader: 'esbuild-loader',
+  $('input[type="email"]').on('input', function () {
+    const input = $(this);
+    let debounceTimeout;
+    clearTimeout(debounceTimeout);
+
+    debounceTimeout = setTimeout(() => {
+      const email = input.val().trim();
+
+      const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+      if (isValidEmail && email !== lastSentEmail) {
+        lastSentEmail = email;
+
+        const emailEvent = new CustomEvent('emailEntered', {
+          detail: {
+            email,
+            timestamp: new Date(),
           },
-        },
-      ],
-    },
-    externals: {
-      prestashop: 'prestashop',
-    },
-    devtool: mode === 'production' ? false : 'source-map',
-    optimization: {
-      minimize: true,
-      minimizer: [new TerserPlugin({
-        extractComments: false
-      })],
-    },
-  };
-};
+        });
+
+        window.dispatchEvent(emailEvent);
+        console.log('Événement "emailEntered" déclenché avec :', email);
+      }
+    }, 5000); // délai en ms après la dernière frappe
+  });
+});
+
+// Exemple de listener pour l'événement
+window.addEventListener('emailEntered', (e) => {
+  console.log('Email détecté :', e.detail.email);
+});
