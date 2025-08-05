@@ -944,6 +944,7 @@ class FrontControllerCore extends Controller
         $this->registerJavascript('theme-custom', '/assets/js/custom.js', ['position' => 'bottom', 'priority' => 1000]);
 
         $assets = $this->context->shop->theme->getPageSpecificAssets($this->php_self);
+
         if (!empty($assets)) {
             foreach ($assets['css'] as $css) {
                 $this->registerStylesheet($css['id'], $css['path'], $css);
@@ -1032,6 +1033,8 @@ class FrontControllerCore extends Controller
 
     /**
      * Checks if token is valid.
+     *
+     * @since 1.5.0.1
      *
      * @return bool
      */
@@ -1313,11 +1316,19 @@ class FrontControllerCore extends Controller
             return false;
         }
 
+        // Initialize this data into cookie, FrontController will use it later
+        $customer->logged = true;
+        $this->context->customer = $customer;
+        $this->context->cookie->id_customer = (int) $customer->id;
+        $this->context->cookie->customer_lastname = $customer->lastname;
+        $this->context->cookie->customer_firstname = $customer->firstname;
+        $this->context->cookie->logged = true;
         $this->context->cookie->check_cgv = 1;
+        $this->context->cookie->is_guest = $customer->isGuest();
+        $this->context->cookie->passwd = $customer->passwd;
+        $this->context->cookie->email = $customer->email;
+        $this->context->cookie->id_guest = (int) $cart->id_guest;
         $this->context->cookie->id_cart = $id_cart;
-
-        // Restore customer session and authentication state (cookie + CustomerSession)
-        $this->context->updateCustomer($customer);
 
         // Return the value for backward compatibility
         return $id_cart;
@@ -1353,6 +1364,8 @@ class FrontControllerCore extends Controller
      * - /themes/default/override/layout-product-1.tpl
      * - /themes/default/override/layout-product.tpl
      * - /themes/default/layout.tpl.
+     *
+     * @since 1.5.0.13
      *
      * @return bool|string
      */
@@ -1955,7 +1968,7 @@ class FrontControllerCore extends Controller
         return $this->translator;
     }
 
-    protected function makeLoginForm($opc = false)
+    protected function makeLoginForm()
     {
         $form = new CustomerLoginForm(
             $this->context->smarty,
@@ -1965,32 +1978,26 @@ class FrontControllerCore extends Controller
             $this->getTemplateVarUrls()
         );
 
-        $form->setAction($this->getCurrentURL().($opc?'?ajax=1&submitLogin=1':''));
+        $form->setAction($this->getCurrentURL());
 
         return $form;
     }
 
-    protected function makeGuestForm($opc = false)
+    protected function makeGuestForm()
     {
         $form = new GuestForm(
             $this->context->smarty,
             $this->context,
             $this->getTranslator(),
-            new GuestFormatter($this->getTranslator(), $this->context->language),
-            new CustomerPersister(
-                $this->context,
-                $this->get('hashing'),
-                $this->getTranslator(),
-                true
-            ),
+            new GuestFormatter($this->getTranslator(), $this->context->language)
         );
 
-        $form->setAction($this->getCurrentURL().($opc?'?ajax=1&submitCreateGuest=1':''));
+        $form->setAction($this->getCurrentURL());
 
         return $form;
     }
 
-    protected function makeCustomerFormatter($opc = false)
+    protected function makeCustomerFormatter()
     {
         $formatter = new CustomerFormatter(
             $this->getTranslator(),
@@ -2004,25 +2011,17 @@ class FrontControllerCore extends Controller
             ->setAskForBirthdate(Configuration::get('PS_CUSTOMER_BIRTHDATE'))
             ->setPartnerOptinRequired($customer->isFieldRequired('optin'));
 
-        if($opc){
-            $formatter->setPasswordRequired(true);
-        }
-
         return $formatter;
     }
 
-    protected function makeCustomerForm($opc = false)
+    protected function makeCustomerForm()
     {
-        if($opc){
-            $guestAllowedCheckout = false;
-        } else {
-            $guestAllowedCheckout = Configuration::get('PS_GUEST_CHECKOUT_ENABLED');
-        }
+        $guestAllowedCheckout = Configuration::get('PS_GUEST_CHECKOUT_ENABLED');
         $form = new CustomerForm(
             $this->context->smarty,
             $this->context,
             $this->getTranslator(),
-            $this->makeCustomerFormatter($opc),
+            $this->makeCustomerFormatter(),
             new CustomerPersister(
                 $this->context,
                 $this->get('hashing'),
@@ -2034,7 +2033,7 @@ class FrontControllerCore extends Controller
 
         $form->setGuestAllowed($guestAllowedCheckout);
 
-        $form->setAction($this->getCurrentURL().($opc?'?ajax=1&submitCustomer=1':''));
+        $form->setAction($this->getCurrentURL());
 
         return $form;
     }

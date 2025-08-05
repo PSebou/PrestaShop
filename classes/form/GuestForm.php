@@ -42,7 +42,6 @@ class GuestFormCore extends AbstractForm
 
     private $context;
 
-    private $customerPersister;
 
     private $IDNConverter;
 
@@ -51,7 +50,6 @@ class GuestFormCore extends AbstractForm
         Context $context,
         TranslatorInterface $translator,
         GuestFormatter $formatter,
-        CustomerPersister $customerPersister,
     ) {
         parent::__construct(
             $smarty,
@@ -59,12 +57,8 @@ class GuestFormCore extends AbstractForm
             $formatter
         );
 
-        $this->customerPersister = $customerPersister;
         $this->context = $context;
         $this->IDNConverter = new InternationalizedDomainNameConverter();
-        if (!$this->formFields) {
-            $this->formFields = $this->formatter->getFormat();
-        }
     }
 
     public function fillWith(array $params = [])
@@ -142,7 +136,7 @@ class GuestFormCore extends AbstractForm
     {
         if ($this->validate()) {
 
-            $ok = $this->customerPersister->save($this->getCustomer());
+            $ok = $this->customerPersister->add($this->getCustomer());
 
             if (!$ok) {
                 foreach ($this->customerPersister->getErrors() as $field => $errors) {
