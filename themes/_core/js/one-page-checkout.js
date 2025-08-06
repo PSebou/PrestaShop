@@ -27,7 +27,7 @@ import $ from 'jquery';
 $(document).ready(() => {
   let lastSentEmail = '';
 
-  $('input[type="email"]').on('input', function () {
+  $('#field-guest-email').on('input', function () {
     const input = $(this);
     let debounceTimeout;
     clearTimeout(debounceTimeout);
@@ -40,7 +40,7 @@ $(document).ready(() => {
       if (isValidEmail && email !== lastSentEmail) {
         lastSentEmail = email;
 
-        const emailEvent = new CustomEvent('emailEntered', {
+        const emailEvent = new CustomEvent('GuestEmailEntered', {
           detail: {
             email,
             timestamp: new Date(),
@@ -55,6 +55,25 @@ $(document).ready(() => {
 });
 
 // Exemple de listener pour l'événement
-window.addEventListener('emailEntered', (e) => {
-  console.log('Email détecté :', e.detail.email);
+window.addEventListener('GuestEmailEntered', (e) => {
+  console.log(e.detail.email);
+  const $form = $('#guest-form');
+
+  if ($form.length) {
+    console.log('Soumission AJAX du formulaire #guest-form…');
+
+    $.ajax({
+      type: $form.attr('method') || 'POST',
+      url: $form.attr('action'),
+      data: $form.serialize(),
+      success(response) {
+        console.log('Formulaire soumis avec succès.', response);
+      },
+      error(xhr, status, error) {
+        console.error('Erreur lors de la soumission du formulaire :', error);
+      },
+    });
+  } else {
+    console.warn('Formulaire #guest-form introuvable.');
+  }
 });
