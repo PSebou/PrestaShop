@@ -30,13 +30,6 @@ class GuestFormatterCore implements FormFormatterInterface
     private $translator;
     private $language;
 
-    private $ask_for_birthdate = true;
-    private $ask_for_partner_optin = true;
-    private $partner_optin_is_required = true;
-    private $ask_for_password = true;
-    private $password_is_required = true;
-    private $ask_for_new_password = false;
-
     public function __construct(
         TranslatorInterface $translator,
         Language            $language
@@ -48,8 +41,8 @@ class GuestFormatterCore implements FormFormatterInterface
 
     public function getFormat()
     {
-        $format['email'] = (new FormField())
-            ->setName('email')
+        $format['guest-email'] = (new FormField())
+            ->setName('guest-email')
             ->setType('email')
             ->setLabel(
                 $this->translator->trans(
@@ -59,6 +52,16 @@ class GuestFormatterCore implements FormFormatterInterface
                 )
             )
             ->setRequired(true);
+
+        $format['lastname'] = (new FormField())
+            ->setName('lastname')
+            ->setType('hidden')
+            ->setValue('');
+
+        $format['firstname'] = (new FormField())
+            ->setName('firstname')
+            ->setType('hidden')
+            ->setValue('');
 
         return $this->addConstraints($format);
     }
