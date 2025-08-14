@@ -1983,16 +1983,22 @@ class FrontControllerCore extends Controller
         return $form;
     }
 
-    protected function makeGuestForm()
+    protected function makeGuestForm($opc = false)
     {
         $form = new GuestForm(
             $this->context->smarty,
             $this->context,
             $this->getTranslator(),
-            new GuestFormatter($this->getTranslator(), $this->context->language)
+            new GuestFormatter($this->getTranslator(), $this->context->language),
+            new CustomerPersister(
+                $this->context,
+                $this->get('hashing'),
+                $this->getTranslator(),
+                true
+            ),
         );
 
-        $form->setAction($this->getCurrentURL());
+        $form->setAction($this->getCurrentURL().($opc?'?ajax=1&submitCreateGuest=1':''));
 
         return $form;
     }
