@@ -41,8 +41,8 @@ class GuestFormatterCore implements FormFormatterInterface
 
     public function getFormat()
     {
-        $format['guest-email'] = (new FormField())
-            ->setName('guest-email')
+        $format['email'] = (new FormField())
+            ->setName('email')
             ->setType('email')
             ->setLabel(
                 $this->translator->trans(
@@ -53,13 +53,8 @@ class GuestFormatterCore implements FormFormatterInterface
             )
             ->setRequired(true);
 
-        $format['lastname'] = (new FormField())
-            ->setName('lastname')
-            ->setType('hidden')
-            ->setValue('');
-
-        $format['firstname'] = (new FormField())
-            ->setName('firstname')
+        $format['id_customer'] = (new FormField())
+            ->setName('id_customer')
             ->setType('hidden')
             ->setValue('');
 
