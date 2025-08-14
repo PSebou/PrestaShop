@@ -27,7 +27,7 @@ import $ from 'jquery';
 $(document).ready(() => {
   let lastSentEmail = '';
 
-  $('#field-guest-email').on('input', function () {
+  $('#guest-form #field-email').on('input', function () {
     const input = $(this);
     let debounceTimeout;
     clearTimeout(debounceTimeout);
@@ -47,33 +47,46 @@ $(document).ready(() => {
           },
         });
 
-        window.dispatchEvent(emailEvent);
-        console.log('Événement "emailEntered" déclenché avec :', email);
+        prestashop.emit('GuestEmailEntered', {
+          detail: {
+            email,
+            timestamp: new Date(),
+          },
+        });
+        console.log('Event "emailEntered" throw with :', email);
       }
     }, 5000); // délai en ms après la dernière frappe
   });
 });
 
 // Exemple de listener pour l'événement
-window.addEventListener('GuestEmailEntered', (e) => {
-  console.log(e.detail.email);
+prestashop.on('GuestEmailEntered', (event) => {
+  console.log(event.detail.email);
+  prestashop.email = event.detail.email;
   const $form = $('#guest-form');
 
   if ($form.length) {
-    console.log('Soumission AJAX du formulaire #guest-form…');
 
     $.ajax({
       type: $form.attr('method') || 'POST',
       url: $form.attr('action'),
       data: $form.serialize(),
       success(response) {
-        console.log('Formulaire soumis avec succès.', response);
+        console.log('Form submit with success.', response);
+        prestashop.emit('GuestEmailSaved', {id_customer: response.idCustomer});
       },
       error(xhr, status, error) {
-        console.error('Erreur lors de la soumission du formulaire :', error);
+        console.error('error on submitting form :', error);
       },
     });
   } else {
-    console.warn('Formulaire #guest-form introuvable.');
+    console.warn('Form #guest-form not found.');
   }
+});
+
+prestashop.on('GuestEmailSaved', (event) => {
+  console.log(event, $('#guest-form [name="id_customer"]'));
+
+  prestashop.id_customer = event.id_customer;
+  $('#guest-form input[name="id_customer"]').val(event.id_customer);
 });
