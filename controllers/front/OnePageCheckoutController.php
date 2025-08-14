@@ -70,7 +70,6 @@ class OnePageCheckoutControllerCore extends FrontController
      */
     public function init(): void
     {
-        ini_set('memory_limit', '4095M');
         parent::init();
         $this->cartChecksum = new CartChecksum(new AddressChecksum());
     }
@@ -101,6 +100,8 @@ class OnePageCheckoutControllerCore extends FrontController
                 $this->context->cookie->write();
                 Tools::redirect($this->context->link->getPageLink('order'));
             }
+        } else if(Tools::isSubmit('submitCreateGuest')){
+            $this->displayAjaxGuestCreate();
         }
 
         $this->bootstrap();
@@ -241,6 +242,41 @@ class OnePageCheckoutControllerCore extends FrontController
         $this->ajaxRender(json_encode($responseData));
     }
 
+    public function displayAjaxGuestCreate(): void
+    {
+        $responseData = [
+            'errors' => false,
+            'idCustomer' => '',
+        ];
+
+        try{
+
+            $customerPersister = new CustomerPersister($this->context,
+                $this->get('hashing'),
+                $this->getTranslator(),
+                true
+            );
+            $customer = new Customer(Tools::getValue('id_customer')??null);
+            $customer->is_guest = true;
+            $customer->email = Tools::getValue('email');
+            $customer->firstname = '';
+            $customer->lastname = '';
+            $ok = $customerPersister->save($customer,'');
+
+            if($ok === false){
+                $responseData['errors'] = true;
+            } else {
+                $responseData['idCustomer'] = $customer->id;
+            }
+
+        }catch (Exception $e){
+            $responseData['errors'] = true;
+            $responseData['message'] = $e->getMessage();
+        }
+        header('Content-Type: application/json');
+        $this->ajaxRender(json_encode($responseData));
+    }
+
     /**
      * Assign template vars related to page content.
      *
@@ -261,7 +297,7 @@ class OnePageCheckoutControllerCore extends FrontController
 
         $shouldRedirectToCart = false;
 
-        // Check the cart meets minimal order amount treshold
+        // Check the cart meets minimal order amount threshold
         // Check that the cart is not empty
         if (count($presentedCart['products']) <= 0 || $presentedCart['minimalPurchaseRequired']) {
             $shouldRedirectToCart = true;
@@ -300,7 +336,7 @@ class OnePageCheckoutControllerCore extends FrontController
 
         $this->context->smarty->assign([
             'guest_allowed' => false,
-            'guest_form'=> $this->makeGuestForm(),
+            'guest_form'=> $this->makeGuestForm(true),
             'register_form' => $this->makeCustomerForm(),
             'login_form' => $this->makeLoginForm(),
             'display_transaction_updated_info' => Tools::getIsset('updatedTransaction'),
