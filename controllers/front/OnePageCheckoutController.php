@@ -64,6 +64,21 @@ class OnePageCheckoutControllerCore extends FrontController
     protected $automaticallyAllocateDeliveryAddress = false;
 
     /**
+     * @var CustomerForm
+     */
+    private CustomerForm $formCustomer;
+
+    /**
+     * @var CustomerLoginForm
+     */
+    private CustomerLoginForm $formLogin;
+
+    /**
+     * @var GuestForm
+     */
+    private GuestForm $formGuest;
+
+    /**
      * Initialize order controller.
      *
      * @see FrontController::init()
@@ -72,6 +87,10 @@ class OnePageCheckoutControllerCore extends FrontController
     {
         parent::init();
         $this->cartChecksum = new CartChecksum(new AddressChecksum());
+        $this->formCustomer = $this->makeCustomerForm(true);
+        $this->formLogin = $this->makeLoginForm(true);
+        $this->formGuest = $this->makeGuestForm();
+
     }
 
     public function postProcess(): void
@@ -100,8 +119,14 @@ class OnePageCheckoutControllerCore extends FrontController
                 $this->context->cookie->write();
                 Tools::redirect($this->context->link->getPageLink('order'));
             }
-        } else if(Tools::isSubmit('submitCreateGuest')){
-            $this->displayAjaxGuestCreate();
+        } else if(Tools::isSubmit('ajax')){
+            if(Tools::isSubmit('submitCreateGuest')){
+                $this->displayAjaxGuestCreate();
+            } else if( Tools::isSubmit('submitLogin')){
+                $this->displayAjaxLogin();
+            } else if( Tools::isSubmit('submitCustomer')){
+                $this->displayAjaxCustomer();
+            }
         }
 
         $this->bootstrap();
@@ -277,6 +302,46 @@ class OnePageCheckoutControllerCore extends FrontController
         $this->ajaxRender(json_encode($responseData));
     }
 
+
+    public function displayAjaxLogin(): void
+    {
+        $responseData = [
+            'errors' => false,
+            'idCustomer' => '',
+        ];
+
+        try{
+            $this->formLogin->submit();
+            $responseData['idCustomer'] = $this->cookie->id_customer;
+
+        }catch (Exception $e){
+            $responseData['errors'] = true;
+            $responseData['message'] = $e->getMessage();
+        }
+        header('Content-Type: application/json');
+        $this->ajaxRender(json_encode($responseData));
+    }
+
+    public function displayAjaxCustomer(): void
+    {
+        $responseData = [
+            'errors' => false,
+            'idCustomer' => '',
+        ];
+
+        try{
+            $this->formCustomer->fillWith(Tools::getAllValues());
+            $this->formCustomer->submit();
+            $responseData['idCustomer'] = $this->context->customer->id;
+
+        }catch (Exception $e){
+            $responseData['errors'] = true;
+            $responseData['message'] = $e->getMessage();
+        }
+        header('Content-Type: application/json');
+        $this->ajaxRender(json_encode($responseData));
+    }
+
     /**
      * Assign template vars related to page content.
      *
@@ -336,9 +401,9 @@ class OnePageCheckoutControllerCore extends FrontController
 
         $this->context->smarty->assign([
             'guest_allowed' => false,
-            'guest_form'=> $this->makeGuestForm(true),
-            'register_form' => $this->makeCustomerForm(),
-            'login_form' => $this->makeLoginForm(),
+            'guest_form'=> $this->formGuest,
+            'register_form' => $this->formCustomer,
+            'login_form' => $this->formLogin,
             'display_transaction_updated_info' => Tools::getIsset('updatedTransaction'),
             'tos_cms' => $this->getDefaultTermsAndConditions(),
         ]);
