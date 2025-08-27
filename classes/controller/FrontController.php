@@ -2049,7 +2049,7 @@ class FrontControllerCore extends Controller
         );
     }
 
-    protected function makeAddressForm()
+    protected function makeAddressForm($opc = false)
     {
         if (Configuration::get('PS_RESTRICT_DELIVERED_COUNTRIES')) {
             $availableCountries = Carrier::getDeliveredCountries($this->context->language->id, true, true);
@@ -2069,7 +2069,7 @@ class FrontControllerCore extends Controller
             )
         );
 
-        $form->setAction($this->getCurrentURL());
+        $form->setAction($this->getCurrentURL().($opc?'?ajax=1&submitCustomerAddress=1':''));
 
         return $form;
     }
