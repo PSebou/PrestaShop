@@ -79,6 +79,11 @@ class OnePageCheckoutControllerCore extends FrontController
     private GuestForm $formGuest;
 
     /**
+     * @var CustomerAddressForm
+     */
+    private CustomerAddressForm $formAddress;
+
+    /**
      * Initialize order controller.
      *
      * @see FrontController::init()
@@ -90,7 +95,8 @@ class OnePageCheckoutControllerCore extends FrontController
         $this->formCustomer = $this->makeCustomerForm(true);
         $this->formLogin = $this->makeLoginForm(true);
         $this->formGuest = $this->makeGuestForm();
-
+        $this->formAddress = $this->makeAddressForm(true);
+        $this->formAddress->fillWith(['id_country' => $this->context->country->id]);
     }
 
     public function postProcess(): void
@@ -130,6 +136,14 @@ class OnePageCheckoutControllerCore extends FrontController
         }
 
         $this->bootstrap();
+
+        $addressStep = new CheckoutAddressesStep(
+            $this->getCheckoutSession(),
+            $this->getTranslator(),
+            $this->makeAddressForm()
+        );
+
+        $this->context->smarty->assign($addressStep->getTemplateParameters());
     }
 
     /**
@@ -404,6 +418,7 @@ class OnePageCheckoutControllerCore extends FrontController
             'guest_form'=> $this->formGuest,
             'register_form' => $this->formCustomer,
             'login_form' => $this->formLogin,
+            'address_form' => $this->formAddress,
             'display_transaction_updated_info' => Tools::getIsset('updatedTransaction'),
             'tos_cms' => $this->getDefaultTermsAndConditions(),
         ]);
@@ -414,14 +429,13 @@ class OnePageCheckoutControllerCore extends FrontController
 
     public function displayAjaxAddressForm(): void
     {
-        $addressForm = $this->makeAddressForm();
 
         if (Tools::getIsset('id_address') && ($id_address = (int) Tools::getValue('id_address'))) {
-            $addressForm->loadAddressById($id_address);
+            $this->formAddress->loadAddressById($id_address);
         }
 
         if (Tools::getIsset('id_country')) {
-            $addressForm->fillWith(['id_country' => Tools::getValue('id_country')]);
+            $this->formAddress->fillWith(['id_country' => Tools::getValue('id_country')]);
         }
 
         $stepTemplateParameters = [];
@@ -432,7 +446,7 @@ class OnePageCheckoutControllerCore extends FrontController
         }
 
         $templateParams = array_merge(
-            $addressForm->getTemplateVariables(),
+            $this->formAddress->getTemplateVariables(),
             $stepTemplateParameters,
             ['type' => 'delivery']
         );
