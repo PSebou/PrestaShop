@@ -29,39 +29,14 @@ use PrestaShop\PrestaShop\Core\Checkout\TermsAndConditions;
 use PrestaShop\PrestaShop\Core\Foundation\Templating\RenderableProxy;
 use PrestaShopBundle\Translation\TranslatorComponent;
 
-class OnePageCheckoutControllerCore extends FrontController
+class OnePageCheckoutControllerCore extends CheckoutController
 {
-    /** @var bool */
-    public $ssl = true;
     /** @var string */
     public $php_self = 'one-page-checkout';
     /** @var string */
     public $page_name = 'one-page-checkout';
-    public $opcWarning = [];
 
-    /**
-     * @var CheckoutProcess
-     */
-    protected $opcProcess;
-
-    /**
-     * @var CartChecksum
-     */
-    protected $cartChecksum;
-
-    /**
-     * Overrides the same parameter in FrontController
-     *
-     * @var bool automaticallyAllocateInvoiceAddress
-     */
-    protected $automaticallyAllocateInvoiceAddress = false;
-
-    /**
-     * Overrides the same parameter in FrontController
-     *
-     * @var bool
-     */
-    protected $automaticallyAllocateDeliveryAddress = false;
+    protected $template = 'checkout/one-page-checkout';
 
     /**
      * @var CustomerForm
@@ -78,10 +53,6 @@ class OnePageCheckoutControllerCore extends FrontController
      */
     private GuestForm $formGuest;
 
-    /**
-     * @var CustomerAddressForm
-     */
-    private CustomerAddressForm $formAddress;
 
     /**
      * Initialize order controller.
@@ -91,41 +62,17 @@ class OnePageCheckoutControllerCore extends FrontController
     public function init(): void
     {
         parent::init();
-        $this->cartChecksum = new CartChecksum(new AddressChecksum());
         $this->formCustomer = $this->makeCustomerForm(true);
         $this->formLogin = $this->makeLoginForm(true);
         $this->formGuest = $this->makeGuestForm();
-        $this->formAddress = $this->makeAddressForm(true);
-        $this->formAddress->fillWith(['id_country' => $this->context->country->id]);
+
     }
 
     public function postProcess(): void
     {
         parent::postProcess();
 
-        if (Tools::isSubmit('submitReorder')
-            && $this->context->customer->isLogged()
-            && $id_order = (int) Tools::getValue('id_order')
-        ) {
-            $oldCart = new Cart(Order::getCartIdStatic($id_order, $this->context->customer->id));
-            $duplication = $oldCart->duplicate();
-            if (!$duplication || !Validate::isLoadedObject($duplication['cart'])) {
-                $this->errors[] = $this->trans('Sorry. We cannot renew your order.', [], 'Shop.Notifications.Error');
-            } elseif (!$duplication['success']) {
-                $this->errors[] = $this->trans(
-                    'Some items are no longer available, and we are unable to renew your order.',
-                    [],
-                    'Shop.Notifications.Error'
-                );
-            } else {
-                $this->context->cookie->id_cart = $duplication['cart']->id;
-                $context = $this->context;
-                $context->cart = $duplication['cart'];
-                CartRule::autoAddToCart($context);
-                $this->context->cookie->write();
-                Tools::redirect($this->context->link->getPageLink('order'));
-            }
-        } else if(Tools::isSubmit('ajax')){
+       if(Tools::isSubmit('ajax')){
             if(Tools::isSubmit('submitCreateGuest')){
                 $this->displayAjaxGuestCreate();
             } else if( Tools::isSubmit('submitLogin')){
@@ -134,16 +81,6 @@ class OnePageCheckoutControllerCore extends FrontController
                 $this->displayAjaxCustomer();
             }
         }
-
-        $this->bootstrap();
-
-        $addressStep = new CheckoutAddressesStep(
-            $this->getCheckoutSession(),
-            $this->getTranslator(),
-            $this->makeAddressForm()
-        );
-
-        $this->context->smarty->assign($addressStep->getTemplateParameters());
     }
 
     /**
@@ -152,133 +89,6 @@ class OnePageCheckoutControllerCore extends FrontController
     public function getCheckoutProcess(): CheckoutProcess
     {
         return $this->checkoutProcess;
-    }
-
-    /**
-     * @return CheckoutSession
-     */
-    public function getCheckoutSession(): CheckoutSession
-    {
-        $deliveryOptionsFinder = new DeliveryOptionsFinder(
-            $this->context,
-            $this->getTranslator(),
-            $this->objectPresenter,
-            new PriceFormatter()
-        );
-
-        $session = new CheckoutSession(
-            $this->context,
-            $deliveryOptionsFinder
-        );
-
-        return $session;
-    }
-
-    protected function bootstrap(): void
-    {
-        $translator = $this->getTranslator();
-        $session = $this->getCheckoutSession();
-
-        $this->checkoutProcess = $this->buildCheckoutProcess($session, $translator);
-        Hook::exec('actionCheckoutRender', ['checkoutProcess' => &$this->checkoutProcess]);
-    }
-
-    /**
-     * Persists cart-related data in checkout session.
-     *
-     * @param CheckoutProcess $process
-     */
-    protected function saveDataToPersist(CheckoutProcess $process)
-    {
-        $data = $process->getDataToPersist();
-        $cart = $this->context->cart;
-
-        $data['checksum'] = $this->cartChecksum->generateChecksum($cart);
-
-        Db::getInstance()->execute(
-            'UPDATE ' . _DB_PREFIX_ . 'cart SET checkout_session_data = "' . pSQL(json_encode($data)) . '"
-                WHERE id_cart = ' . (int) $cart->id
-        );
-    }
-
-    /**
-     * Restores from checkout session some previously persisted cart-related data.
-     *
-     * @param CheckoutProcess $process
-     */
-    protected function restorePersistedData(CheckoutProcess $process)
-    {
-        $cart = $this->context->cart;
-        $customer = $this->context->customer;
-        $rawData = Db::getInstance()->getValue(
-            'SELECT checkout_session_data FROM ' . _DB_PREFIX_ . 'cart WHERE id_cart = ' . (int) $cart->id
-        );
-        $data = json_decode($rawData ?? '', true);
-        if (!is_array($data)) {
-            $data = [];
-        }
-
-        $addressValidator = new AddressValidator();
-        $invalidAddressIds = $addressValidator->validateCartAddresses($cart);
-
-        // Build the currently selected address' warning message (if relevant)
-        if (!$customer->isGuest() && !empty($invalidAddressIds)) {
-            $this->checkoutWarning['address'] = [
-                'id_address' => (int) reset($invalidAddressIds),
-                'exception' => $this->trans(
-                    'Your address is incomplete, please update it.',
-                    [],
-                    'Shop.Notifications.Error'
-                ),
-            ];
-        }
-
-        // Prevent check for guests
-        if ($customer->id) {
-            // Prepare all other addresses' warning messages (if relevant).
-            // These messages are displayed when changing the selected address.
-            $allInvalidAddressIds = $addressValidator->validateCustomerAddresses($customer, $this->context->language);
-            $this->checkoutWarning['invalid_addresses'] = $allInvalidAddressIds;
-        }
-
-        if (isset($data['checksum']) && $data['checksum'] === $this->cartChecksum->generateChecksum($cart)) {
-            $process->restorePersistedData($data);
-        }
-    }
-
-    public function displayAjaxselectDeliveryOption(): void
-    {
-        $cart = $this->cart_presenter->present(
-            $this->context->cart,
-            true
-        );
-
-        ob_end_clean();
-        header('Content-Type: application/json');
-        $this->ajaxRender(json_encode([
-            'preview' => $this->render('checkout/_partials/cart-summary', [
-                'cart' => $cart,
-                'static_token' => Tools::getToken(false),
-            ]),
-        ]));
-    }
-
-    public function displayAjaxCheckCartStillOrderable(): void
-    {
-        $responseData = [
-            'errors' => false,
-            'cartUrl' => '',
-        ];
-
-        if ($this->context->cart->isAllProductsInStock() !== true
-            || $this->context->cart->checkAllProductsAreStillAvailableInThisState() !== true
-            || $this->context->cart->checkAllProductsHaveMinimalQuantities() !== true) {
-            $responseData['errors'] = true;
-            $responseData['cartUrl'] = $this->context->link->getPageLink('cart', null, null, ['action' => 'show']);
-        }
-
-        header('Content-Type: application/json');
-        $this->ajaxRender(json_encode($responseData));
     }
 
     public function displayAjaxGuestCreate(): void
@@ -363,54 +173,7 @@ class OnePageCheckoutControllerCore extends FrontController
      */
     public function initContent(): void
     {
-        if (Configuration::isCatalogMode()) {
-            Tools::redirect('index.php');
-        }
-
-        $this->restorePersistedData($this->checkoutProcess);
-        $this->checkoutProcess->handleRequest(
-            Tools::getAllValues()
-        );
-
-        $presentedCart = $this->cart_presenter->present($this->context->cart, true);
-
-        $shouldRedirectToCart = false;
-
-        // Check the cart meets minimal order amount threshold
-        // Check that the cart is not empty
-        if (count($presentedCart['products']) <= 0 || $presentedCart['minimalPurchaseRequired']) {
-            $shouldRedirectToCart = true;
-        }
-
-        // Check that products are still orderable, at any point in checkout
-        if ($this->context->cart->isAllProductsInStock() !== true
-            || $this->context->cart->checkAllProductsAreStillAvailableInThisState() !== true
-            || $this->context->cart->checkAllProductsHaveMinimalQuantities() !== true) {
-            $shouldRedirectToCart = true;
-        }
-
-        // If there was a problem, we redirect the user to cart, CartController deals with display of detailed errors
-        // We don't redirect in case of ajax requests, so we can get our response
-        if ($shouldRedirectToCart === true && !$this->ajax) {
-            $cartLink = $this->context->link->getPageLink('cart', null, null, ['action' => 'show']);
-            $this->redirectWithNotifications($cartLink);
-        }
-
-        $this->checkoutProcess
-            ->setNextStepReachable()
-            ->markCurrentStep()
-            ->invalidateAllStepsAfterCurrent();
-
-        $this->saveDataToPersist($this->checkoutProcess);
-
-        if (!$this->checkoutProcess->hasErrors()) {
-            if ($_SERVER['REQUEST_METHOD'] !== 'GET' && !$this->ajax) {
-                $this->redirectWithNotifications(
-                    $this->checkoutProcess->getCheckoutSession()->getCheckoutURL()
-                );
-            }
-        }
-
+        parent::initContent();
         $this->registerJavascript('one-page-checkout', '/themes/one-page-checkout.js', ['position' => 'bottom', 'priority' => 1000]);
 
         $this->context->smarty->assign([
@@ -418,24 +181,23 @@ class OnePageCheckoutControllerCore extends FrontController
             'guest_form'=> $this->formGuest,
             'register_form' => $this->formCustomer,
             'login_form' => $this->formLogin,
-            'address_form' => $this->formAddress,
             'display_transaction_updated_info' => Tools::getIsset('updatedTransaction'),
             'tos_cms' => $this->getDefaultTermsAndConditions(),
         ]);
 
-        parent::initContent();
         $this->setTemplate('checkout/one-page-checkout');
     }
 
     public function displayAjaxAddressForm(): void
     {
+        $addressForm = $this->makeAddressForm();
 
         if (Tools::getIsset('id_address') && ($id_address = (int) Tools::getValue('id_address'))) {
-            $this->formAddress->loadAddressById($id_address);
+            $addressForm->loadAddressById($id_address);
         }
 
         if (Tools::getIsset('id_country')) {
-            $this->formAddress->fillWith(['id_country' => Tools::getValue('id_country')]);
+            $addressForm->fillWith(['id_country' => Tools::getValue('id_country')]);
         }
 
         $stepTemplateParameters = [];
@@ -446,7 +208,7 @@ class OnePageCheckoutControllerCore extends FrontController
         }
 
         $templateParams = array_merge(
-            $this->formAddress->getTemplateVariables(),
+            $addressForm->getTemplateVariables(),
             $stepTemplateParameters,
             ['type' => 'delivery']
         );
@@ -460,95 +222,5 @@ class OnePageCheckoutControllerCore extends FrontController
                 $templateParams
             ),
         ]));
-    }
-
-    /**
-     * Return default TOS link for checkout footer
-     *
-     * @return string|bool
-     */
-    protected function getDefaultTermsAndConditions(): string|bool
-    {
-        $cms = new CMS((int) Configuration::get('PS_CONDITIONS_CMS_ID'), $this->context->language->id);
-
-        if (!Validate::isLoadedObject($cms)) {
-            return false;
-        }
-
-        $link = $this->context->link->getCMSLink($cms, $cms->link_rewrite);
-
-        $termsAndConditions = new TermsAndConditions();
-        $termsAndConditions
-            ->setText(
-                '[' . $cms->meta_title . ']',
-                $link
-            )
-            ->setIdentifier('terms-and-conditions-footer');
-
-        return $termsAndConditions->format();
-    }
-
-    /**
-     * @param CheckoutSession $session
-     * @param TranslatorComponent $translator
-     *
-     * @return CheckoutProcess
-     */
-    protected function buildCheckoutProcess(CheckoutSession $session, $translator)
-    {
-        $opcProcess = new CheckoutProcess(
-            $this->context,
-            $session
-        );
-
-        $opcProcess
-            ->addStep(new CheckoutPersonalInformationStep(
-                $this->context,
-                $translator,
-                $this->makeLoginForm(),
-                $this->makeCustomerForm(),
-                $this->makeGuestForm()
-            ))
-            ->addStep(new CheckoutAddressesStep(
-                $this->context,
-                $translator,
-                $this->makeAddressForm()
-            ));
-
-        if (!$this->context->cart->isVirtualCart()) {
-            $checkoutDeliveryStep = new CheckoutDeliveryStep(
-                $this->context,
-                $translator
-            );
-
-            $checkoutDeliveryStep
-                ->setRecyclablePackAllowed((bool) Configuration::get('PS_RECYCLABLE_PACK'))
-                ->setGiftAllowed((bool) Configuration::get('PS_GIFT_WRAPPING'))
-                ->setIncludeTaxes(
-                    !Product::getTaxCalculationMethod((int) $this->context->cart->id_customer)
-                    && (int) Configuration::get('PS_TAX')
-                )
-                ->setDisplayTaxesLabel(Configuration::get('PS_TAX'))
-                ->setGiftCost(
-                    $this->context->cart->getGiftWrappingPrice(
-                        $checkoutDeliveryStep->getIncludeTaxes()
-                    )
-                );
-
-            $opcProcess->addStep($checkoutDeliveryStep);
-        }
-
-        $opcProcess
-            ->addStep(new CheckoutPaymentStep(
-                $this->context,
-                $translator,
-                new PaymentOptionsFinder(),
-                new ConditionsToApproveFinder(
-                    $this->context,
-                    $translator
-                )
-            ));
-
-        return $opcProcess;
     }
 }
