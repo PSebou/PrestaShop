@@ -59,6 +59,7 @@ class CategoryLang extends CategoryLangCore {};
 class CccReducer extends CccReducerCore {};
 class Chart extends ChartCore {};
 class CheckoutAddressesStep extends CheckoutAddressesStepCore {};
+class CheckoutController extends CheckoutControllerCore {};
 class CheckoutDeliveryStep extends CheckoutDeliveryStepCore {};
 class CheckoutPaymentStep extends CheckoutPaymentStepCore {};
 class CheckoutPersonalInformationStep extends CheckoutPersonalInformationStepCore {};
