@@ -28,27 +28,29 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function checkCustomerFormIsValid(){
-
-  if(!isValidEmail($('#customer-form #field-email').val())){
+function checkCustomerFormIsValid() {
+  if (!isValidEmail($('#customer-form #field-email').val())) {
     console.log('email is invalid');
     return false;
-  } else if($('#customer-form #field-password').val() === ''){
+  }
+  if ($('#customer-form #field-password').val() === '') {
     console.log('password is empty');
     return false;
-  } else if($('#customer-form #field-firstname').val() === ''){
+  }
+  if ($('#customer-form #field-firstname').val() === '') {
     console.log('firstname is empty');
     return false;
-  } else if($('#customer-form #field-lastname').val() === ''){
+  }
+  if ($('#customer-form #field-lastname').val() === '') {
     console.log('lastname is empty');
     return false;
-  } else if(!$('#customer-form [name="customer_privacy"]').is(':checked')){
+  }
+  if (!$('#customer-form [name="customer_privacy"]').is(':checked')) {
     console.log('customer privacy not checked');
     return false;
-  }else{
-    console.log('all good');
-    return true;
   }
+  console.log('all good');
+  return true;
 }
 
 $(document).ready(() => {
@@ -64,12 +66,12 @@ $(document).ready(() => {
     debounceTimeout = setTimeout(() => {
       const email = input.val().trim();
 
-      const isValidEmail = isValidEmail(email);
+      const opcIsValidEmail = isValidEmail(email);
 
-      if (isValidEmail && email !== lastSentEmail) {
+      if (opcIsValidEmail && email !== lastSentEmail) {
         lastSentEmail = email;
 
-        prestashop.emit('GuestEmailEntered', {
+        prestashop.emit('opc.GuestEmailEntered', {
           detail: {
             email,
             timestamp: new Date(),
@@ -84,22 +86,21 @@ $(document).ready(() => {
     clearTimeout(debounceTimeout);
 
     debounceTimeout = setTimeout(() => {
-      let email = $(this).val();
+      const email = $(this).val();
 
+      const opcIsValidEmail = isValidEmail(email);
 
-      const isValidEmail = isValidEmail(email);
-
-      if (isValidEmail) {
+      if (opcIsValidEmail) {
         loginEmailReady = email;
-        prestashop.emit('LoginEmailReady', {
+        prestashop.emit('opc.LoginEmailReady', {
           detail: {
             email,
             timestamp: new Date(),
           },
         });
         console.log('Event "LoginEmailReady" throw with :', email);
-        if(loginPasswordReady) {
-          prestashop.emit('LoginReady', {
+        if (loginPasswordReady) {
+          prestashop.emit('opc.LoginReady', {
             detail: {
               email,
               timestamp: new Date(),
@@ -111,19 +112,19 @@ $(document).ready(() => {
     }, 4000);
   });
 
-  $('#login-form input#field-password').on('input', function () {
+  $('#login-form input#field-password').on('input', () => {
     clearTimeout(debounceTimeout);
 
     debounceTimeout = setTimeout(() => {
       loginPasswordReady = true;
-      prestashop.emit('LoginPasswordReady', {
+      prestashop.emit('opc.LoginPasswordReady', {
         detail: {
           timestamp: new Date(),
         },
       });
       console.log('Event "LoginPasswordReady"');
       if (loginEmailReady) {
-        prestashop.emit('LoginReady', {
+        prestashop.emit('opc.LoginReady', {
           detail: {
             loginEmailReady,
             timestamp: new Date(),
@@ -134,18 +135,17 @@ $(document).ready(() => {
     }, 5000);
   });
 
-  $('#customer-form input').on('input', function () {
+  $('#customer-form input').on('input', () => {
     clearTimeout(debounceTimeout);
 
     debounceTimeout = setTimeout(() => {
-     if(checkCustomerFormIsValid()){
-       prestashop.emit('CustomerFormReady',{detail: {timestamp: new Date()}});
-     } else {
-       console.log('form NOT ready');
-     }
+      if (checkCustomerFormIsValid()) {
+        prestashop.emit('opc.CustomerFormReady', {detail: {timestamp: new Date()}});
+      } else {
+        console.log('form NOT ready');
+      }
     }, 5000);
   });
-
 });
 
 prestashop.on('PersonalInformationError', (event) => {
@@ -153,7 +153,7 @@ prestashop.on('PersonalInformationError', (event) => {
   const errorDiv = $('#personal_information_error');
   errorDiv.html(event.detail.message);
   errorDiv.show('fast');
-})
+});
 
 prestashop.on('GuestEmailEntered', (event) => {
   prestashop.email = event.detail.email;
@@ -166,21 +166,21 @@ prestashop.on('GuestEmailEntered', (event) => {
       url: $form.attr('action'),
       data: $form.serialize(),
       success(response) {
-        if(response.errors){
-          prestashop.emit('PersonalInformationError',{
+        if (response.errors) {
+          prestashop.emit('opc.PersonalInformationError', {
             detail: {
               message: response.message,
-            }
+            },
           });
         }
         console.log('Form submit with success.', response);
-        prestashop.emit('GuestEmailSaved', {id_customer: response.idCustomer});
+        prestashop.emit('opc.GuestEmailSaved', {id_customer: response.idCustomer});
       },
       error(xhr, status, error) {
-        prestashop.emit('PersonalInformationError',{
+        prestashop.emit('opc.PersonalInformationError', {
           detail: {
             message: error,
-          }
+          },
         });
       },
     });
@@ -196,34 +196,33 @@ prestashop.on('GuestEmailSaved', (event) => {
   $('#guest-form input[name="id_customer"]').val(event.id_customer);
 });
 
-prestashop.on('LoginReady', (event) => {
+prestashop.on('LoginReady', () => {
   const $form = $('#login-form');
 
   if ($form.length) {
-
     $.ajax({
       type: $form.attr('method') || 'POST',
       url: $form.attr('action'),
       data: $form.serialize(),
       success(response) {
         console.log('Form submit with success.', response);
-        if(response.errors){
+        if (response.errors) {
           console.error(response.message);
-          prestashop.emit('PersonalInformationError',{
+          prestashop.emit('opc.PersonalInformationError', {
             detail: {
               message: response.message,
-            }
+            },
           });
-        } else{
-          prestashop.emit('LoginSuccessfully', {id_customer: response.idCustomer});
+        } else {
+          prestashop.emit('opc.LoginSuccessfully', {id_customer: response.idCustomer});
         }
       },
       error(xhr, status, error) {
         console.error('error on submitting form :', error);
-        prestashop.emit('PersonalInformationError',{
+        prestashop.emit('opc.PersonalInformationError', {
           detail: {
             message: error,
-          }
+          },
         });
       },
     });
@@ -232,38 +231,37 @@ prestashop.on('LoginReady', (event) => {
   }
 });
 
-prestashop.on('CustomerFormReady', (event) => {
+prestashop.on('CustomerFormReady', () => {
   const $form = $('#customer-form');
 
   if ($form.length) {
-
     $.ajax({
       type: $form.attr('method') || 'POST',
       url: $form.attr('action'),
       data: $form.serialize(),
       success(response) {
-        if(response.errors){
-          prestashop.emit('PersonalInformationError',{
+        if (response.errors) {
+          prestashop.emit('opc.PersonalInformationError', {
             detail: {
               message: response.message,
-            }
+            },
           });
         }
         console.log('Form submit with success.', response);
-        prestashop.emit('CustomerSaved', {id_customer: response.idCustomer});
+        prestashop.emit('opc.CustomerSaved', {id_customer: response.idCustomer});
       },
       error(xhr, status, error) {
-        prestashop.emit('PersonalInformationError',{
+        prestashop.emit('opc.PersonalInformationError', {
           detail: {
             message: error,
-          }
+          },
         });
       },
     });
   } else {
     console.warn('Form #guest-form not found.');
   }
-})
+});
 
 prestashop.on('CustomerSaved', (event) => {
   $('#personal_information_error').hide();
