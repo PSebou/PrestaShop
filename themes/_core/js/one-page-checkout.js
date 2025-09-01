@@ -148,14 +148,14 @@ $(document).ready(() => {
   });
 });
 
-prestashop.on('PersonalInformationError', (event) => {
+prestashop.on('opc.PersonalInformationError', (event) => {
   console.error('PersonalInformationError :', event);
   const errorDiv = $('#personal_information_error');
   errorDiv.html(event.detail.message);
   errorDiv.show('fast');
 });
 
-prestashop.on('GuestEmailEntered', (event) => {
+prestashop.on('opc.GuestEmailEntered', (event) => {
   prestashop.email = event.detail.email;
   const $form = $('#guest-form');
 
@@ -189,14 +189,14 @@ prestashop.on('GuestEmailEntered', (event) => {
   }
 });
 
-prestashop.on('GuestEmailSaved', (event) => {
+prestashop.on('opc.GuestEmailSaved', (event) => {
   console.log(event, $('#guest-form [name="id_customer"]'));
 
   prestashop.id_customer = event.id_customer;
   $('#guest-form input[name="id_customer"]').val(event.id_customer);
 });
 
-prestashop.on('LoginReady', () => {
+prestashop.on('opc.LoginReady', () => {
   const $form = $('#login-form');
 
   if ($form.length) {
@@ -231,7 +231,7 @@ prestashop.on('LoginReady', () => {
   }
 });
 
-prestashop.on('CustomerFormReady', () => {
+prestashop.on('opc.CustomerFormReady', () => {
   const $form = $('#customer-form');
 
   if ($form.length) {
@@ -263,7 +263,7 @@ prestashop.on('CustomerFormReady', () => {
   }
 });
 
-prestashop.on('CustomerSaved', (event) => {
+prestashop.on('opc.CustomerSaved', (event) => {
   $('#personal_information_error').hide();
   prestashop.id_customer = event.id_customer;
   $('#guest-form input[name="id_customer"]').val(event.id_customer);

@@ -36,43 +36,13 @@ class OnePageCheckoutControllerCore extends CheckoutController
     /** @var string */
     public $page_name = 'one-page-checkout';
 
-    protected $template = 'checkout/one-page-checkout';
-
-    /**
-     * @var CustomerForm
-     */
-    private CustomerForm $formCustomer;
-
-    /**
-     * @var CustomerLoginForm
-     */
-    private CustomerLoginForm $formLogin;
-
-    /**
-     * @var GuestForm
-     */
-    private GuestForm $formGuest;
-
-
-    /**
-     * Initialize order controller.
-     *
-     * @see FrontController::init()
-     */
-    public function init(): void
-    {
-        parent::init();
-        $this->formCustomer = $this->makeCustomerForm(true);
-        $this->formLogin = $this->makeLoginForm(true);
-        $this->formGuest = $this->makeGuestForm();
-
-    }
+    protected $template = 'checkout/checkout';
 
     public function postProcess(): void
     {
         parent::postProcess();
 
-       if(Tools::isSubmit('ajax')){
+        if(Tools::isSubmit('ajax')){
             if(Tools::isSubmit('submitCreateGuest')){
                 $this->displayAjaxGuestCreate();
             } else if( Tools::isSubmit('submitLogin')){
@@ -135,7 +105,8 @@ class OnePageCheckoutControllerCore extends CheckoutController
         ];
 
         try{
-            $this->formLogin->submit();
+            $formLogin = $this->makeLoginForm();
+            $formLogin->submit();
             $responseData['idCustomer'] = $this->cookie->id_customer;
 
         }catch (Exception $e){
@@ -153,9 +124,10 @@ class OnePageCheckoutControllerCore extends CheckoutController
             'idCustomer' => '',
         ];
 
+        $formCustomer = $this->makeCustomerForm();
         try{
-            $this->formCustomer->fillWith(Tools::getAllValues());
-            $this->formCustomer->submit();
+           $formCustomer->fillWith(Tools::getAllValues());
+           $formCustomer->submit();
             $responseData['idCustomer'] = $this->context->customer->id;
 
         }catch (Exception $e){
@@ -173,19 +145,24 @@ class OnePageCheckoutControllerCore extends CheckoutController
      */
     public function initContent(): void
     {
-        parent::initContent();
         $this->registerJavascript('one-page-checkout', '/themes/one-page-checkout.js', ['position' => 'bottom', 'priority' => 1000]);
+        parent::initContent();
 
-        $this->context->smarty->assign([
-            'guest_allowed' => false,
-            'guest_form'=> $this->formGuest,
-            'register_form' => $this->formCustomer,
-            'login_form' => $this->formLogin,
-            'display_transaction_updated_info' => Tools::getIsset('updatedTransaction'),
-            'tos_cms' => $this->getDefaultTermsAndConditions(),
-        ]);
+        foreach ($this->checkoutProcess->getSteps() as $step){
+            switch ($step->getIdentifier()){
+                case 'checkout-personal-information-step':
+                    $step->setReachable(true);
+                    $step->setCurrent(true);
+                    $step->setTemplate('checkout/_partials/opc/personal-information.tpl');
+                    break;
+                case 'checkout-addresses-step':
+                    $step->setReachable(true);
+                    $step->setCurrent(true);
+                    $step->setTemplate('checkout/_partials/opc/addresses.tpl');
+                    break;
+            }
+        }
 
-        $this->setTemplate('checkout/one-page-checkout');
     }
 
     public function displayAjaxAddressForm(): void
@@ -223,4 +200,97 @@ class OnePageCheckoutControllerCore extends CheckoutController
             ),
         ]));
     }
+
+    /**
+     * @param CheckoutSession $session
+     * @param TranslatorComponent $translator
+     *
+     * @return CheckoutProcess
+     */
+    protected function buildCheckoutProcess(CheckoutSession $session, $translator)
+    {
+        $this->checkoutProcess = new CheckoutProcess(
+            $this->context,
+            $session
+        );
+
+        $this->checkoutProcess
+            ->addStep(new CheckoutPersonalInformationStep(
+                $this->context,
+                $translator,
+                $this->makeLoginForm(),
+                $this->makeCustomerForm(),
+                $this->makeGuestForm(),
+            ))
+            ->addStep(new CheckoutAddressesStep(
+                $this->context,
+                $translator,
+                $this->makeAddressForm()
+            ));
+
+        if (!$this->context->cart->isVirtualCart()) {
+            $checkoutDeliveryStep = new CheckoutDeliveryStep(
+                $this->context,
+                $translator
+            );
+
+            $checkoutDeliveryStep
+                ->setRecyclablePackAllowed((bool) Configuration::get('PS_RECYCLABLE_PACK'))
+                ->setGiftAllowed((bool) Configuration::get('PS_GIFT_WRAPPING'))
+                ->setIncludeTaxes(
+                    !Product::getTaxCalculationMethod((int) $this->context->cart->id_customer)
+                    && (int) Configuration::get('PS_TAX')
+                )
+                ->setDisplayTaxesLabel(Configuration::get('PS_TAX'))
+                ->setGiftCost(
+                    $this->context->cart->getGiftWrappingPrice(
+                        $checkoutDeliveryStep->getIncludeTaxes()
+                    )
+                );
+
+            $this->checkoutProcess ->addStep($checkoutDeliveryStep);
+        }
+
+        $this->checkoutProcess
+            ->addStep(new CheckoutPaymentStep(
+                $this->context,
+                $translator,
+                new PaymentOptionsFinder(),
+                new ConditionsToApproveFinder(
+                    $this->context,
+                    $translator
+                )
+            ));
+
+        return $this->checkoutProcess;
+    }
+
+    public function makeCustomerForm()
+    {
+        $customerForm = parent::makeCustomerForm();
+        $customerForm->setAction($this->getCurrentURL().'?ajax=1&submitCustomer=1');
+        return $customerForm;
+    }
+
+    public function makeCustomerFormatter()
+    {
+        $customerFormatter = parent::makeCustomerFormatter();
+        $customerFormatter->setPasswordRequired(true);
+        return $customerFormatter;
+    }
+
+    public function makeGuestForm()
+    {
+        $guestForm = parent::makeGuestForm();
+        $guestForm->setAction($this->getCurrentURL().'?ajax=1&submitCreateGuest=1');
+        return $guestForm;
+    }
+
+    public function makeLoginForm()
+    {
+        $loginForm = parent::makeLoginForm();
+        $loginForm->setAction($this->getCurrentURL().'?ajax=1&submitLogin=1');
+        return $loginForm;
+    }
+
 }
