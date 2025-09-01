@@ -1956,7 +1956,7 @@ class FrontControllerCore extends Controller
         return $this->translator;
     }
 
-    protected function makeLoginForm($opc = false)
+    protected function makeLoginForm()
     {
         $form = new CustomerLoginForm(
             $this->context->smarty,
@@ -1966,12 +1966,12 @@ class FrontControllerCore extends Controller
             $this->getTemplateVarUrls()
         );
 
-        $form->setAction($this->getCurrentURL().($opc?'?ajax=1&submitLogin=1':''));
+        $form->setAction($this->getCurrentURL());
 
         return $form;
     }
 
-    protected function makeGuestForm($opc = false)
+    protected function makeGuestForm()
     {
         $form = new GuestForm(
             $this->context->smarty,
@@ -1986,12 +1986,12 @@ class FrontControllerCore extends Controller
             ),
         );
 
-        $form->setAction($this->getCurrentURL().($opc?'?ajax=1&submitCreateGuest=1':''));
+        $form->setAction($this->getCurrentURL());
 
         return $form;
     }
 
-    protected function makeCustomerFormatter($opc = false)
+    protected function makeCustomerFormatter()
     {
         $formatter = new CustomerFormatter(
             $this->getTranslator(),
@@ -2005,25 +2005,17 @@ class FrontControllerCore extends Controller
             ->setAskForBirthdate(Configuration::get('PS_CUSTOMER_BIRTHDATE'))
             ->setPartnerOptinRequired($customer->isFieldRequired('optin'));
 
-        if($opc){
-            $formatter->setPasswordRequired(true);
-        }
-
         return $formatter;
     }
 
-    protected function makeCustomerForm($opc = false)
+    protected function makeCustomerForm()
     {
-        if($opc){
-            $guestAllowedCheckout = false;
-        } else {
-            $guestAllowedCheckout = Configuration::get('PS_GUEST_CHECKOUT_ENABLED');
-        }
+        $guestAllowedCheckout = Configuration::get('PS_GUEST_CHECKOUT_ENABLED');
         $form = new CustomerForm(
             $this->context->smarty,
             $this->context,
             $this->getTranslator(),
-            $this->makeCustomerFormatter($opc),
+            $this->makeCustomerFormatter(),
             new CustomerPersister(
                 $this->context,
                 $this->get('hashing'),
@@ -2035,7 +2027,7 @@ class FrontControllerCore extends Controller
 
         $form->setGuestAllowed($guestAllowedCheckout);
 
-        $form->setAction($this->getCurrentURL().($opc?'?ajax=1&submitCustomer=1':''));
+        $form->setAction($this->getCurrentURL());
 
         return $form;
     }
@@ -2049,7 +2041,7 @@ class FrontControllerCore extends Controller
         );
     }
 
-    protected function makeAddressForm($opc = false)
+    protected function makeAddressForm()
     {
         if (Configuration::get('PS_RESTRICT_DELIVERED_COUNTRIES')) {
             $availableCountries = Carrier::getDeliveredCountries($this->context->language->id, true, true);
@@ -2069,7 +2061,7 @@ class FrontControllerCore extends Controller
             )
         );
 
-        $form->setAction($this->getCurrentURL().($opc?'?ajax=1&submitCustomerAddress=1':''));
+        $form->setAction($this->getCurrentURL());
 
         return $form;
     }
