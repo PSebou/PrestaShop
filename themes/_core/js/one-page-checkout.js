@@ -53,6 +53,18 @@ function checkCustomerFormIsValid() {
   return true;
 }
 
+function checkAddressFormIsValid() {
+  let ret = true;
+  $('.js-address-form .form-control[required]').each((index, element) => {
+    console.log($(element).val());
+    if ($(element).val() === '') {
+      ret = false;
+    }
+  });
+
+  return ret;
+}
+
 $(document).ready(() => {
   let lastSentEmail = '';
   let loginEmailReady = false;
@@ -146,6 +158,19 @@ $(document).ready(() => {
       }
     }, 5000);
   });
+
+  $('.js-address-form').on('input', '.form-control', () => {
+    clearTimeout(debounceTimeout);
+
+    debounceTimeout = setTimeout(() => {
+      if (checkAddressFormIsValid()) {
+        console.log('emit opc.addressFormReady');
+        prestashop.emit('opc.AddressFormReady', {detail: {timestamp: new Date()}});
+      } else {
+        console.log('form NOT ready');
+      }
+    }, 5000);
+  });
 });
 
 prestashop.on('opc.PersonalInformationError', (event) => {
@@ -160,7 +185,6 @@ prestashop.on('opc.GuestEmailEntered', (event) => {
   const $form = $('#guest-form');
 
   if ($form.length) {
-
     $.ajax({
       type: $form.attr('method') || 'POST',
       url: $form.attr('action'),
@@ -191,9 +215,9 @@ prestashop.on('opc.GuestEmailEntered', (event) => {
 
 prestashop.on('opc.GuestEmailSaved', (event) => {
   console.log(event, $('#guest-form [name="id_customer"]'));
-
   prestashop.id_customer = event.id_customer;
   $('#guest-form input[name="id_customer"]').val(event.id_customer);
+  prestashop.emit('opc.PersonalInformationSuccess', {id_customer: event.id_customer});
 });
 
 prestashop.on('opc.LoginReady', () => {
@@ -267,4 +291,38 @@ prestashop.on('opc.CustomerSaved', (event) => {
   $('#personal_information_error').hide();
   prestashop.id_customer = event.id_customer;
   $('#guest-form input[name="id_customer"]').val(event.id_customer);
+  prestashop.emit('opc.PersonalInformationSuccess', {id_customer: event.id_customer});
+
+});
+
+prestashop.on('opc.AddressFormReady', (event) => {
+  const $form = $('.js-address-form form');
+
+  if ($form.length) {
+    $.ajax({
+      type: $form.attr('method') || 'POST',
+      url: $form.attr('action'),
+      data: $form.serialize(),
+      success(response) {
+        if (response.errors) {
+          prestashop.emit('opc.AddressError', {
+            detail: {
+              message: response.message,
+            },
+          });
+        }
+        console.log('Form submit with success.', response);
+        prestashop.emit('opc.AddressSaved', {id_address: response.id_address});
+      },
+      error(xhr, status, error) {
+        prestashop.emit('opc.AddressError', {
+          detail: {
+            message: error,
+          },
+        });
+      },
+    });
+  } else {
+    console.warn('Form .js-address-form form not found.');
+  }
 });

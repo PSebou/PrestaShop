@@ -49,7 +49,10 @@ class OnePageCheckoutControllerCore extends CheckoutController
                 $this->displayAjaxLogin();
             } else if( Tools::isSubmit('submitCustomer')){
                 $this->displayAjaxCustomer();
+            } else if( Tools::isSubmit('submitCustomer')){
+                $this->displayAjaxCustomerAddress();
             }
+
         }
     }
 
@@ -96,7 +99,6 @@ class OnePageCheckoutControllerCore extends CheckoutController
         $this->ajaxRender(json_encode($responseData));
     }
 
-
     public function displayAjaxLogin(): void
     {
         $responseData = [
@@ -106,8 +108,9 @@ class OnePageCheckoutControllerCore extends CheckoutController
 
         try{
             $formLogin = $this->makeLoginForm();
+            $formLogin->fillWith(Tools::getAllValues());
             $formLogin->submit();
-            $responseData['idCustomer'] = $this->cookie->id_customer;
+            $responseData['idCustomer'] = $this->context->customer->id;
 
         }catch (Exception $e){
             $responseData['errors'] = true;
@@ -268,7 +271,7 @@ class OnePageCheckoutControllerCore extends CheckoutController
     public function makeCustomerForm()
     {
         $customerForm = parent::makeCustomerForm();
-        $customerForm->setAction($this->getCurrentURL().'?ajax=1&submitCustomer=1');
+        $customerForm->setAction($this->getCurrentURL().'?ajax=1&action=customer=1');
         return $customerForm;
     }
 
@@ -282,15 +285,31 @@ class OnePageCheckoutControllerCore extends CheckoutController
     public function makeGuestForm()
     {
         $guestForm = parent::makeGuestForm();
-        $guestForm->setAction($this->getCurrentURL().'?ajax=1&submitCreateGuest=1');
+        $guestForm->setAction($this->getCurrentURL().'?ajax=1&action=createGuest');
         return $guestForm;
     }
 
     public function makeLoginForm()
     {
         $loginForm = parent::makeLoginForm();
-        $loginForm->setAction($this->getCurrentURL().'?ajax=1&submitLogin=1');
+        $loginForm->setAction($this->getCurrentURL().'?ajax=1&action=login');
         return $loginForm;
     }
 
+    public function makeAddressForm()
+    {
+        $addressForm = parent::makeAddressForm();
+        $addressForm->setAction($this->getCurrentURL().'?ajax=1&action=customerAddress');
+        return $addressForm;
+
+    }
+
+    public function displayAjaxCustomerAddress()
+    {
+        foreach ($this->getCheckoutProcess()->getSteps() as $step){
+            if($step->getIdentifier() == 'checkout-addresses-step'){
+                $step->handleRequest(Tools::getAllValues());
+            }
+        }
+    }
 }
