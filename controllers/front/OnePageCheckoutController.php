@@ -24,11 +24,6 @@
  * @license   https://opensource.org/licenses/OSL-3.0 Open Software License (OSL 3.0)
  */
 
-use PrestaShop\PrestaShop\Adapter\Product\PriceFormatter;
-use PrestaShop\PrestaShop\Core\Checkout\TermsAndConditions;
-use PrestaShop\PrestaShop\Core\Foundation\Templating\RenderableProxy;
-use PrestaShopBundle\Translation\TranslatorComponent;
-
 class OnePageCheckoutControllerCore extends CheckoutController
 {
     /** @var string */
@@ -53,7 +48,6 @@ class OnePageCheckoutControllerCore extends CheckoutController
      */
     private GuestForm $formGuest;
 
-
     /**
      * Initialize order controller.
      *
@@ -65,7 +59,6 @@ class OnePageCheckoutControllerCore extends CheckoutController
         $this->formCustomer = $this->makeCustomerForm(true);
         $this->formLogin = $this->makeLoginForm(true);
         $this->formGuest = $this->makeGuestForm();
-
     }
 
     public function postProcess(): void
@@ -73,11 +66,11 @@ class OnePageCheckoutControllerCore extends CheckoutController
         parent::postProcess();
 
        if(Tools::isSubmit('ajax')){
-            if(Tools::isSubmit('submitCreateGuest')){
+            if (Tools::isSubmit('submitCreateGuest')) {
                 $this->displayAjaxGuestCreate();
-            } else if( Tools::isSubmit('submitLogin')){
+            } elseif ( Tools::isSubmit('submitLogin')) {
                 $this->displayAjaxLogin();
-            } else if( Tools::isSubmit('submitCustomer')){
+            } elseif ( Tools::isSubmit('submitCustomer')) {
                 $this->displayAjaxCustomer();
             }
         }
@@ -98,34 +91,31 @@ class OnePageCheckoutControllerCore extends CheckoutController
             'idCustomer' => '',
         ];
 
-        try{
-
+        try {
             $customerPersister = new CustomerPersister($this->context,
                 $this->get('hashing'),
                 $this->getTranslator(),
                 true
             );
-            $customer = new Customer(Tools::getValue('id_customer')??null);
+            $customer = new Customer(Tools::getValue('id_customer') ?? null);
             $customer->is_guest = true;
             $customer->email = Tools::getValue('email');
             $customer->firstname = '';
             $customer->lastname = '';
-            $ok = $customerPersister->save($customer,'');
+            $ok = $customerPersister->save($customer, '');
 
-            if($ok === false){
+            if ($ok === false) {
                 $responseData['errors'] = true;
             } else {
                 $responseData['idCustomer'] = $customer->id;
             }
-
-        }catch (Exception $e){
+        } catch (Exception $e) {
             $responseData['errors'] = true;
             $responseData['message'] = $e->getMessage();
         }
         header('Content-Type: application/json');
         $this->ajaxRender(json_encode($responseData));
     }
-
 
     public function displayAjaxLogin(): void
     {
@@ -134,11 +124,10 @@ class OnePageCheckoutControllerCore extends CheckoutController
             'idCustomer' => '',
         ];
 
-        try{
+        try {
             $this->formLogin->submit();
             $responseData['idCustomer'] = $this->cookie->id_customer;
-
-        }catch (Exception $e){
+        } catch (Exception $e) {
             $responseData['errors'] = true;
             $responseData['message'] = $e->getMessage();
         }
@@ -153,12 +142,11 @@ class OnePageCheckoutControllerCore extends CheckoutController
             'idCustomer' => '',
         ];
 
-        try{
+        try {
             $this->formCustomer->fillWith(Tools::getAllValues());
             $this->formCustomer->submit();
             $responseData['idCustomer'] = $this->context->customer->id;
-
-        }catch (Exception $e){
+        } catch (Exception $e) {
             $responseData['errors'] = true;
             $responseData['message'] = $e->getMessage();
         }
@@ -178,7 +166,7 @@ class OnePageCheckoutControllerCore extends CheckoutController
 
         $this->context->smarty->assign([
             'guest_allowed' => false,
-            'guest_form'=> $this->formGuest,
+            'guest_form' => $this->formGuest,
             'register_form' => $this->formCustomer,
             'login_form' => $this->formLogin,
             'display_transaction_updated_info' => Tools::getIsset('updatedTransaction'),

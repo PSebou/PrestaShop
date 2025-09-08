@@ -414,7 +414,7 @@ class CheckoutControllerCore extends FrontController
                     )
                 );
 
-            $this->checkoutProcess ->addStep($checkoutDeliveryStep);
+            $this->checkoutProcess->addStep($checkoutDeliveryStep);
         }
 
         $this->checkoutProcess

@@ -32,9 +32,8 @@ class GuestFormatterCore implements FormFormatterInterface
 
     public function __construct(
         TranslatorInterface $translator,
-        Language            $language
-    )
-    {
+        Language $language
+    ) {
         $this->translator = $translator;
         $this->language = $language;
     }

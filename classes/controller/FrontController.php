@@ -1508,7 +1508,7 @@ class FrontControllerCore extends Controller
                 'address', 'addresses', 'authentication', 'manufacturer', 'cart', 'category', 'cms', 'contact',
                 'discount', 'guest-tracking', 'history', 'identity', 'index', 'my-account',
                 'order-confirmation', 'order-detail', 'order-follow', 'order', 'order-return',
-                'order-slip','onepagecheckout', 'pagenotfound', 'password', 'pdf-invoice', 'pdf-order-return', 'pdf-order-slip',
+                'order-slip', 'onepagecheckout', 'pagenotfound', 'password', 'pdf-invoice', 'pdf-order-return', 'pdf-order-slip',
                 'prices-drop', 'product', 'registration', 'search', 'sitemap', 'stores', 'supplier', 'new-products',
             ];
             foreach ($p as $page_name) {
@@ -1966,7 +1966,7 @@ class FrontControllerCore extends Controller
             $this->getTemplateVarUrls()
         );
 
-        $form->setAction($this->getCurrentURL().($opc?'?ajax=1&submitLogin=1':''));
+        $form->setAction($this->getCurrentURL() . ($opc ? '?ajax=1&submitLogin=1' : ''));
 
         return $form;
     }
@@ -1986,7 +1986,7 @@ class FrontControllerCore extends Controller
             ),
         );
 
-        $form->setAction($this->getCurrentURL().($opc?'?ajax=1&submitCreateGuest=1':''));
+        $form->setAction($this->getCurrentURL() . ($opc ? '?ajax=1&submitCreateGuest=1' : ''));
 
         return $form;
     }
@@ -2014,7 +2014,7 @@ class FrontControllerCore extends Controller
 
     protected function makeCustomerForm($opc = false)
     {
-        if($opc){
+        if ($opc) {
             $guestAllowedCheckout = false;
         } else {
             $guestAllowedCheckout = Configuration::get('PS_GUEST_CHECKOUT_ENABLED');
@@ -2035,7 +2035,7 @@ class FrontControllerCore extends Controller
 
         $form->setGuestAllowed($guestAllowedCheckout);
 
-        $form->setAction($this->getCurrentURL().($opc?'?ajax=1&submitCustomer=1':''));
+        $form->setAction($this->getCurrentURL() . ($opc ? '?ajax=1&submitCustomer=1' : ''));
 
         return $form;
     }

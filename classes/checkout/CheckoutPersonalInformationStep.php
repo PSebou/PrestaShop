@@ -50,7 +50,7 @@ class CheckoutPersonalInformationStepCore extends AbstractCheckoutStep
         TranslatorInterface $translator,
         CustomerLoginForm $loginForm,
         CustomerForm $registerForm,
-        GuestForm $guestForm = null
+        ?GuestForm $guestForm = null
     ) {
         parent::__construct($context, $translator);
         $this->loginForm = $loginForm;

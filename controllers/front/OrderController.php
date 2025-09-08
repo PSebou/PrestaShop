@@ -26,7 +26,6 @@
 
 class OrderControllerCore extends CheckoutController
 {
-
     /** @var string */
     public $php_self = 'order';
     /** @var string */
