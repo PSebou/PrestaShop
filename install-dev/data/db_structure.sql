@@ -615,7 +615,7 @@ CREATE TABLE `PREFIX_customer` (
   `id_customer` int(10) unsigned NOT NULL auto_increment,
   `id_shop_group` INT(11) UNSIGNED NOT NULL DEFAULT '1',
   `id_shop` INT(11) UNSIGNED NOT NULL DEFAULT '1',
-  `id_gender` int(10) unsigned DEFAULT NULL,
+  `id_gender` int(10) unsigned NOT NULL,
   `id_default_group` int(10) unsigned NOT NULL DEFAULT '1',
   `id_lang` int(10) unsigned NULL,
   `id_risk` int(10) unsigned NOT NULL DEFAULT '1',

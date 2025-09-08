@@ -29,6 +29,11 @@ use PrestaShop\PrestaShop\Core\Checkout\TermsAndConditions;
 use PrestaShop\PrestaShop\Core\Foundation\Templating\RenderableProxy;
 use PrestaShopBundle\Translation\TranslatorComponent;
 
+/**
+ * This class is the base for 5 steps and One-page checkout
+ * The OrderController is for 5 steps (legacy)
+ * The OnePageCheckoutController is for one-page checkout flow
+ */
 class CheckoutControllerCore extends FrontController
 {
     /** @var bool */
