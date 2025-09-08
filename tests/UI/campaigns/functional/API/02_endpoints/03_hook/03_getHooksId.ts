@@ -2,18 +2,15 @@
 import testContext from '@utils/testContext';
 
 // Import commonTests
-import {deleteAPIClientTest} from '@commonTests/BO/advancedParameters/authServer';
+import {requestAccessToken} from '@commonTests/BO/advancedParameters/authServer';
 
 import {expect} from 'chai';
 import {
   type APIRequestContext,
-  boApiClientsPage,
-  boApiClientsCreatePage,
   boDashboardPage,
   boDesignPositionsPage,
   boLoginPage,
   type BrowserContext,
-  FakerAPIClient,
   type Page,
   utilsAPI,
   utilsPlaywright,
@@ -21,26 +18,19 @@ import {
 
 const baseContext: string = 'functional_API_endpoints_hook_getHooksId';
 
-describe('API : GET /hook/{id}', async () => {
+describe('API : GET /hook/{hookId}', async () => {
   let apiContext: APIRequestContext;
   let browserContext: BrowserContext;
   let page: Page;
-  let clientSecret: string;
   let accessToken: string;
   let jsonResponse: any;
-  let idHook: number;
+  let hookId: number;
   let statusHook: boolean;
   let nameHook: string;
   let titleHook: string;
   let descriptionHook: string;
 
   const clientScope: string = 'hook_read';
-  const clientData: FakerAPIClient = new FakerAPIClient({
-    enabled: true,
-    scopes: [
-      clientScope,
-    ],
-  });
 
   before(async function () {
     browserContext = await utilsPlaywright.createBrowserContext(this.browser);
@@ -54,6 +44,13 @@ describe('API : GET /hook/{id}', async () => {
   });
 
   describe('BackOffice : Fetch the access token', async () => {
+    it(`should request the endpoint /access_token with scope ${clientScope}`, async function () {
+      await testContext.addContextItem(this, 'testIdentifier', 'requestOauth2Token', baseContext);
+      accessToken = await requestAccessToken(clientScope);
+    });
+  });
+
+  describe('BackOffice : Expected data', async () => {
     it('should login in BO', async function () {
       await testContext.addContextItem(this, 'testIdentifier', 'loginBO', baseContext);
 
@@ -64,78 +61,6 @@ describe('API : GET /hook/{id}', async () => {
       expect(pageTitle).to.contains(boDashboardPage.pageTitle);
     });
 
-    it('should go to \'Advanced Parameters > API Client\' page', async function () {
-      await testContext.addContextItem(this, 'testIdentifier', 'goToAdminAPIPage', baseContext);
-
-      await boDashboardPage.goToSubMenu(
-        page,
-        boDashboardPage.advancedParametersLink,
-        boDashboardPage.adminAPILink,
-      );
-
-      const pageTitle = await boApiClientsPage.getPageTitle(page);
-      expect(pageTitle).to.eq(boApiClientsPage.pageTitle);
-    });
-
-    it('should check that no records found', async function () {
-      await testContext.addContextItem(this, 'testIdentifier', 'checkThatNoRecordFound', baseContext);
-
-      const noRecordsFoundText = await boApiClientsPage.getTextForEmptyTable(page);
-      expect(noRecordsFoundText).to.contains('warning No records found');
-    });
-
-    it('should go to add New API Client page', async function () {
-      await testContext.addContextItem(this, 'testIdentifier', 'goToNewAPIClientPage', baseContext);
-
-      await boApiClientsPage.goToNewAPIClientPage(page);
-
-      const pageTitle = await boApiClientsCreatePage.getPageTitle(page);
-      expect(pageTitle).to.eq(boApiClientsCreatePage.pageTitleCreate);
-    });
-
-    it('should create API Client', async function () {
-      await testContext.addContextItem(this, 'testIdentifier', 'createAPIClient', baseContext);
-
-      const textResult = await boApiClientsCreatePage.addAPIClient(page, clientData);
-      expect(textResult).to.contains(boApiClientsCreatePage.successfulCreationMessage);
-
-      const textMessage = await boApiClientsCreatePage.getAlertInfoBlockParagraphContent(page);
-      expect(textMessage).to.contains(boApiClientsCreatePage.apiClientGeneratedMessage);
-    });
-
-    it('should copy client secret', async function () {
-      await testContext.addContextItem(this, 'testIdentifier', 'copyClientSecret', baseContext);
-
-      await boApiClientsCreatePage.copyClientSecret(page);
-
-      clientSecret = await boApiClientsCreatePage.getClipboardText(page);
-      expect(clientSecret.length).to.be.gt(0);
-    });
-
-    it('should request the endpoint /access_token', async function () {
-      await testContext.addContextItem(this, 'testIdentifier', 'requestOauth2Token', baseContext);
-
-      const apiResponse = await apiContext.post('access_token', {
-        form: {
-          client_id: clientData.clientId,
-          client_secret: clientSecret,
-          grant_type: 'client_credentials',
-          scope: clientScope,
-        },
-      });
-      expect(apiResponse.status()).to.eq(200);
-      expect(utilsAPI.hasResponseHeader(apiResponse, 'Content-Type')).to.eq(true);
-      expect(utilsAPI.getResponseHeader(apiResponse, 'Content-Type')).to.contains('application/json');
-
-      const jsonResponse = await apiResponse.json();
-      expect(jsonResponse).to.have.property('access_token');
-      expect(jsonResponse.token_type).to.be.a('string');
-
-      accessToken = jsonResponse.access_token;
-    });
-  });
-
-  describe('BackOffice : Expected data', async () => {
     it('should go to \'Design > Positions\' page', async function () {
       await testContext.addContextItem(this, 'testIdentifier', 'goToPositionsPage', baseContext);
 
@@ -153,8 +78,8 @@ describe('API : GET /hook/{id}', async () => {
     it('should get the hook informations', async function () {
       await testContext.addContextItem(this, 'testIdentifier', 'getHookInformations', baseContext);
 
-      idHook = await boDesignPositionsPage.getHookId(page, 0);
-      expect(idHook).to.be.gt(0);
+      hookId = await boDesignPositionsPage.getHookId(page, 0);
+      expect(hookId).to.be.gt(0);
 
       statusHook = await boDesignPositionsPage.getHookStatus(page, 0);
       expect(statusHook).to.be.equal(true);
@@ -171,10 +96,10 @@ describe('API : GET /hook/{id}', async () => {
   });
 
   describe('API : Check Data', async () => {
-    it('should request the endpoint /hook/{id}', async function () {
+    it('should request the endpoint /hook/{hookId}', async function () {
       await testContext.addContextItem(this, 'testIdentifier', 'requestEndpoint', baseContext);
 
-      const apiResponse = await apiContext.get(`hook/${idHook}`, {
+      const apiResponse = await apiContext.get(`hook/${hookId}`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
@@ -190,7 +115,7 @@ describe('API : GET /hook/{id}', async () => {
       await testContext.addContextItem(this, 'testIdentifier', 'checkResponseKeys', baseContext);
 
       expect(jsonResponse).to.have.all.keys(
-        'id',
+        'hookId',
         'active',
         'name',
         'title',
@@ -198,12 +123,12 @@ describe('API : GET /hook/{id}', async () => {
       );
     });
 
-    it('should check the JSON Response : `id`', async function () {
+    it('should check the JSON Response : `hookId`', async function () {
       await testContext.addContextItem(this, 'testIdentifier', 'checkResponseId', baseContext);
 
-      expect(jsonResponse).to.have.property('id');
-      expect(jsonResponse.id).to.be.a('number');
-      expect(jsonResponse.id).to.be.equal(idHook);
+      expect(jsonResponse).to.have.property('hookId');
+      expect(jsonResponse.hookId).to.be.a('number');
+      expect(jsonResponse.hookId).to.be.equal(hookId);
     });
 
     it('should check the JSON Response : `active`', async function () {
@@ -238,7 +163,4 @@ describe('API : GET /hook/{id}', async () => {
       expect(jsonResponse.description).to.be.equal(descriptionHook);
     });
   });
-
-  // Pre-condition: Create an API Client
-  deleteAPIClientTest(`${baseContext}_postTest`);
 });

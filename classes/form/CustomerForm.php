@@ -206,9 +206,9 @@ class CustomerFormCore extends AbstractForm
      */
     protected function validateFieldLength($fieldName, $maximumLength, $violationMessage)
     {
-        $emailField = $this->getField($fieldName);
-        if (strlen($emailField->getValue()) > $maximumLength) {
-            $emailField->addError($violationMessage);
+        $field = $this->getField($fieldName);
+        if (strlen($field->getValue()) > $maximumLength) {
+            $field->addError($violationMessage);
         }
     }
 
@@ -269,6 +269,10 @@ class CustomerFormCore extends AbstractForm
 
     public function getTemplateVariables()
     {
+        if (!$this->formFields) {
+            $this->formFields = $this->formatter->getFormat();
+        }
+
         return [
             'action' => $this->action,
             'urls' => $this->urls,

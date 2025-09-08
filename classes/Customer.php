@@ -822,7 +822,7 @@ class CustomerCore extends ObjectModel
     public static function checkPassword($idCustomer, $passwordHash)
     {
         if (!Validate::isUnsignedId($idCustomer)) {
-            die(Tools::displayError('Customer ID is invalid.'));
+            throw new PrestaShopException('Customer ID is invalid.');
         }
 
         // Check that customers password hasn't changed since last login
@@ -1348,8 +1348,6 @@ class CustomerCore extends ObjectModel
     /**
      * Check customer information and return customer validity.
      *
-     * @since 1.5.0
-     *
      * @param bool $withGuest
      *
      * @return bool customer validity
@@ -1372,8 +1370,6 @@ class CustomerCore extends ObjectModel
 
     /**
      * Logout.
-     *
-     * @since 1.5.0
      */
     public function logout()
     {
@@ -1392,8 +1388,6 @@ class CustomerCore extends ObjectModel
     /**
      * Soft logout, delete everything that links to the customer
      * but leave there affiliate's information.
-     *
-     * @since 1.5.0
      */
     public function mylogout()
     {
